@@ -59,6 +59,21 @@ PlayerSnapshot *playerSnapshot_createOne(const Player *player) {
 	return snapshot;
 }
 
+/**
+ * Swaps a snapshot's players for the cache players at `playerIds`, keeping the snapshot itself, so
+ * whoever holds a pointer to it sees the new set. Pointers into the old players array do not survive.
+ */
+void playerSnapshot_replace(PlayerSnapshot *snapshot, const uint32_t *playerIds, const uint64_t count) {
+	PlayerSnapshot *replacement = playerSnapshot_create(playerIds, count);
+	if (replacement == NULL) {
+		return;
+	}
+
+	free(snapshot->players);
+	*snapshot = *replacement;
+	free(replacement);
+}
+
 // Signature matches GDestroyNotify so a window can own its snapshot directly.
 void playerSnapshot_free(void *snapshot) {
 	PlayerSnapshot *self = snapshot;

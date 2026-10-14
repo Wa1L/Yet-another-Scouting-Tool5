@@ -28,6 +28,7 @@ the [Steam version of Football Manager 24](https://store.steampowered.com/app/22
 	- value
 	- home, current and world reputation
 	- contract: maximum wage, expiring within a number of months, transfer or loan listed, unattached
+	- likely to join your club: an estimate from reputation, as the game's own interest is not read
 	- preferred foot
 	- fast learners and hot prospects
 	- up to three attributes, hidden and personality attributes included (e.g. professionalism of 15 or more)
@@ -60,6 +61,12 @@ the [Steam version of Football Manager 24](https://store.steampowered.com/app/22
 	  and age limit
 - View squad depth, outlining the strength of your options across all positions
 	- The squad planner flags positions with no cover, ageing options, expiring contracts or a weak first choice
+- **My Squad** shows squad depth and the squad planner for the club you manage, which you choose in Settings
+
+### Settings
+
+- Choose the club you manage, add, edit, reorder and delete formations, and edit the rating weights for every role,
+  all from the **Settings** window. Changes are saved to **options.yaml**, so editing the file by hand still works
 
 ![Screenshot of best XI](docs/best-xi.png?v=1)
 ![Screenshot of squad depth](docs/squad-depth.png?v=1)
@@ -74,6 +81,8 @@ the [Steam version of Football Manager 24](https://store.steampowered.com/app/22
 | Ctrl+B    | Best XI                                   |
 | Ctrl+D    | Squad depth                               |
 | Ctrl+L    | Shortlist                                 |
+| Ctrl+M    | My Squad                                  |
+| Ctrl+,    | Settings                                  |
 | Ctrl+S    | Shortlist (or un-shortlist) a player, from their Player Info window |
 | Ctrl+W    | Close the window                          |
 

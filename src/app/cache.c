@@ -7,6 +7,7 @@
 #include "app/injury-names.h"
 #include "app/maths.h"
 #include "app/mocks.h"
+#include "app/my-club.h"
 #include "app/player.h"
 #include "app/player-table.h"
 #include "app/search-handler.h"
@@ -183,6 +184,7 @@ void cache_clear(void) {
 		free(gameContext.players);
 		gameContext.players = NULL;
 		gameContext.playerCount = 0;
+		myClub_reset();
 	}
 
 	// Called every tick while disconnected, so only pay for the rebuild when something was dropped.
@@ -496,6 +498,7 @@ static gboolean onPlayerThreadComplete(gpointer userData) {
 	gameContext.playerCount = stagingPlayerCount;
 	stagingPlayers = NULL;
 	stagingPlayerCount = 0;
+	myClub_rebuild();
 
 	char buffer[FORMATTER_NUMBER_SIZE];
 	snprintf(buffer, sizeof(buffer), "%llu", gameContext.playerCount);

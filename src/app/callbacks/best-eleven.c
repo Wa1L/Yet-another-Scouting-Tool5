@@ -16,3 +16,11 @@ BUILDER_CALLBACK void callbacks_onShowSquadDepth(void) {
 BUILDER_CALLBACK void callbacks_onShowShortlist(void) {
 	ui_createShortlistWindow();
 }
+
+BUILDER_CALLBACK void callbacks_onShowMySquad(void) {
+	ui_createMySquadWindow();
+}
+
+BUILDER_CALLBACK void callbacks_onShowSettings(void) {
+	ui_createSettingsWindow();
+}

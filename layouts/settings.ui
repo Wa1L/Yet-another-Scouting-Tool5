@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Yet another Scouting Tool - GTK4 GtkBuilder UI definition.
+  See: https://docs.gtk.org/gtk4/class.Builder.html
+-->
+<interface domain="settings">
+	<!-- interface-name settings.ui -->
+	<!-- interface-copyright SPDX-FileCopyrightText: © 2026 Phil Armstead <philarmstead@mailbox.org>
+SPDX-License-Identifier: GPL-3.0-or-later -->
+	<!-- interface-authors Phil Armstead <philarmstead@mailbox.org> -->
+	<requires lib="gtk" version="4.0"/>
+	<!-- The pages' contents are built in settings.c; everything here is saved to options.yaml -->
+	<object class="GtkWindow" id="window:settings">
+		<property name="default-width">900</property>
+		<property name="default-height">640</property>
+		<property name="title">Yet another Scouting Tool · Settings</property>
+		<style>
+			<class name="app-root"/>
+			<class name="settings-root"/>
+		</style>
+		<child>
+			<object class="GtkNotebook" id="notebook:settings">
+				<child>
+					<object class="GtkScrolledWindow">
+						<property name="hscrollbar-policy">never</property>
+						<child>
+							<object class="GtkBox" id="page:my-club">
+								<property name="orientation">vertical</property>
+								<property name="spacing">12</property>
+								<style>
+									<class name="settings-page"/>
+								</style>
+							</object>
+						</child>
+					</object>
+				</child>
+				<child type="tab">
+					<object class="GtkLabel">
+						<property name="label">My club</property>
+					</object>
+				</child>
+				<child>
+					<object class="GtkBox" id="page:formations">
+						<property name="orientation">horizontal</property>
+						<property name="spacing">24</property>
+						<style>
+							<class name="settings-page"/>
+						</style>
+					</object>
+				</child>
+				<child type="tab">
+					<object class="GtkLabel">
+						<property name="label">Formations</property>
+					</object>
+				</child>
+				<child>
+					<object class="GtkBox" id="page:ratings">
+						<property name="orientation">vertical</property>
+						<property name="spacing">12</property>
+						<style>
+							<class name="settings-page"/>
+						</style>
+					</object>
+				</child>
+				<child type="tab">
+					<object class="GtkLabel">
+						<property name="label">Ratings</property>
+					</object>
+				</child>
+			</object>
+		</child>
+	</object>
+</interface>

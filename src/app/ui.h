@@ -48,6 +48,10 @@ void ui_createUpgradeFinderWindow(
 );
 void ui_renderUpgradeFinderWindow(WindowContext context);
 void ui_rebindUpgradeFinderWindow(WindowContext context, const PlayerLookup *lookup);
+void ui_createMySquadWindow(void);
+void ui_createSettingsWindow(void);
+void ui_renderSettingsWindow(WindowContext context);
+void ui_rerenderSettingsClub(WindowContext context);
 void ui_refreshAllWindows(void);
 void ui_refreshShortlistViews(void);
 void ui_presentSearchWindow(void);

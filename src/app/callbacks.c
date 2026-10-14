@@ -68,6 +68,14 @@ static gboolean handleWindowShortcut(const WindowContext *context, const guint k
 			callbacks_onShowShortlist();
 			return TRUE;
 		}
+		if (primary && key == GDK_KEY_m) {
+			callbacks_onShowMySquad();
+			return TRUE;
+		}
+		if (primary && key == GDK_KEY_comma) {
+			callbacks_onShowSettings();
+			return TRUE;
+		}
 		if (primary && key == GDK_KEY_p) {
 			callbacks_onShowCurrentPlayer();
 			return TRUE;

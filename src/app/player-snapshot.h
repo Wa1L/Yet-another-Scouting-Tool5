@@ -35,6 +35,7 @@ typedef struct {
 PlayerSnapshot *playerSnapshot_create(const uint32_t *playerIds, uint64_t count);
 PlayerSnapshot *playerSnapshot_createOne(const Player *player);
 void playerSnapshot_free(void *snapshot);
+void playerSnapshot_replace(PlayerSnapshot *snapshot, const uint32_t *playerIds, uint64_t count);
 
 bool playerLookup_build(PlayerLookup *out);
 void playerLookup_destroy(PlayerLookup *lookup);

@@ -33,7 +33,7 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 						<property name="margin-start">30</property>
 						<property name="margin-end">30</property>
 						<child>
-							<object class="GtkLabel">
+							<object class="GtkLabel" id="label:title">
 								<property name="label">Squad Depth</property>
 								<property name="halign">start</property>
 								<property name="xalign">0</property>
