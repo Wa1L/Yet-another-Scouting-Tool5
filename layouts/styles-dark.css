@@ -19,6 +19,8 @@ window {
 	--border-colour-pill-learner: #3182ce;
 	--background-colour-pill-prospect: #3d2112;
 	--border-colour-pill-prospect: #dd6b20;
+	--background-colour-pill-transfer: #3d1717;
+	--border-colour-pill-transfer: #e53e3e;
 	--background-colour-popover: #f8f9fa;
 	--background-colour-primary: #0f1216;
 	--border-colour-primary: #232a31;
@@ -38,10 +40,12 @@ window {
 	--colour-on-accent: #fff;
 	--colour-pill-learner: #90cdf4;
 	--colour-pill-prospect: #fbd38d;
+	--colour-pill-transfer: #feb2b2;
 	--colour-potential-ability: #66cb93;
 	--colour-primary: #c2c9d0;
 	--colour-primary-dark: #9aa4ad;
 	--colour-primary-darker: #7f8a93;
 	--colour-section-heading: #8fa0b3;
 	--colour-title: #f2f2f2;
+	--colour-warning: #f0a04b;
 }

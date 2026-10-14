@@ -8,6 +8,42 @@ reloadable" in this app, meaning changes will be reflected upon saving with no r
 
 Set to `true` to enable dark mode. **Default value** is `dark-mode: false`
 
+### Columns
+
+The columns shown in the player search results, in the order they appear. Any column left out is hidden. The
+**Columns** button above the results updates this line for you, so you rarely need to edit it by hand. If the option is
+missing, every built-in column is shown in its default order. For example:
+
+```
+columns: nationality name age positions foot ca pa rating value-for-money wage contract club Pace Professionalism
+```
+
+The built-in columns are:
+
+| Key               | Column                                                                    |
+|-------------------|---------------------------------------------------------------------------|
+| `nationality`     | Flags                                                                     |
+| `name`            | Name                                                                      |
+| `age`             | Age                                                                       |
+| `positions`       | Positions                                                                 |
+| `foot`            | Preferred foot                                                            |
+| `ca`              | Current ability                                                           |
+| `pa`              | Potential ability                                                         |
+| `diff`            | PA minus CA                                                               |
+| `status`          | Injury, fast learner and hot prospect icons                               |
+| `rating`          | Best role rating                                                          |
+| `value`           | Guide value                                                               |
+| `value-for-money` | Rating points per £1M of guide value (values under £100K count as £100K) |
+| `wage`            | Weekly wage                                                               |
+| `contract`        | Contract end date                                                         |
+| `club`            | Club                                                                      |
+| `home-rep`        | Home reputation                                                           |
+| `current-rep`     | Current reputation                                                        |
+| `world-rep`       | World reputation                                                          |
+
+Any attribute can also be shown as a column, using its name from the [list of attributes](#weights) (e.g. `Pace`,
+`InjuryProneness`).
+
 ### Formations
 
 The formations displayed in the "Best XI" window. Rearrange the list or modify it to suit your tactical needs. **Default

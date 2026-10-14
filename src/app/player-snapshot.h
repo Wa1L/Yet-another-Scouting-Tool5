@@ -38,4 +38,5 @@ void playerSnapshot_free(void *snapshot);
 
 bool playerLookup_build(PlayerLookup *out);
 void playerLookup_destroy(PlayerLookup *lookup);
+const Player *playerLookup_find(const PlayerLookup *lookup, uint32_t uid);
 void playerSnapshot_refresh(PlayerSnapshot *snapshot, const PlayerLookup *lookup);

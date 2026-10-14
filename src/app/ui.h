@@ -18,6 +18,9 @@ void ui_createFilterTag(const char *text, GtkEntryBuffer *buffer);
 void ui_createClubFilterTag(const char *name, GtkEditable *buffer);
 void ui_createNationalityFilterTag(const char *name, GtkEditable *buffer);
 void ui_createPositionFilterTag(const char *name, GtkCheckButton *button);
+void ui_createCheckFilterTag(const char *text, GtkCheckButton *button);
+void ui_createEditableFilterTag(const char *text, GtkEditable *editable);
+void ui_createDropDownFilterTag(const char *text, GtkDropDown *dropDown);
 void ui_loadStylesheet(const char *fileName, guint priority);
 
 WindowContext openWindow(const char *layoutName, const char *windowName, WindowType type, void *data);
@@ -31,7 +34,23 @@ void ui_rebindBestElevenWindow(WindowContext context, const PlayerLookup *lookup
 void ui_createSquadDepthWindow(void);
 void ui_renderSquadDepthWindow(WindowContext context);
 void ui_rebindSquadDepthWindow(WindowContext context, const PlayerLookup *lookup);
+void ui_createShortlistWindow(void);
+void ui_renderShortlistWindow(WindowContext context);
+void ui_createSimilarPlayersWindow(const Player *player);
+void ui_renderSimilarPlayersWindow(WindowContext context);
+void ui_createUpgradeFinderWindow(
+	const PositionCode positions[FORMATION_POSITION_COUNT],
+	const BestElevenRow rows[FORMATION_POSITION_COUNT],
+	const PlayerSnapshot *squad,
+	float minImprovement,
+	uint32_t maxValue,
+	uint8_t maxAge
+);
+void ui_renderUpgradeFinderWindow(WindowContext context);
+void ui_rebindUpgradeFinderWindow(WindowContext context, const PlayerLookup *lookup);
 void ui_refreshAllWindows(void);
+void ui_refreshShortlistViews(void);
+void ui_presentSearchWindow(void);
 void ui_rebindPlayerWindows(void);
 void ui_rerenderPlayerWindows(void);
 

@@ -63,6 +63,26 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 							</object>
 						</child>
 						<child>
+							<object class="GtkLabel">
+								<property name="label">SQUAD PLANNER</property>
+								<property name="halign">start</property>
+								<property name="tooltip-text">Positions that are thin, ageing, weak or about to lose a player to an expiring contract</property>
+								<style>
+									<class name="section-title"/>
+								</style>
+							</object>
+						</child>
+						<child>
+							<!-- Filled in squad-depth.c with one row per problem found -->
+							<object class="GtkBox" id="box:planner">
+								<property name="orientation">vertical</property>
+								<property name="spacing">4</property>
+								<style>
+									<class name="squad-planner"/>
+								</style>
+							</object>
+						</child>
+						<child>
 							<object class="GtkGrid" id="grid:squad-positions">
 								<property name="column-spacing">22</property>
 								<property name="row-spacing">26</property>

@@ -24,7 +24,7 @@ static inline void getPersonName(void *handle, uint8_t pointer[8], char str[PERS
 static inline void getPersonForename(void *handle, uint64_t attributeBase, char str[PERSON_COMMON_NAME_LENGTH]);
 static inline void getPersonSurname(void *handle, uint64_t attributeBase, char str[PERSON_COMMON_NAME_LENGTH]);
 static inline void getPersonCommonName(void *handle, uint64_t attributeBase, char str[PERSON_COMMON_NAME_LENGTH]);
-static int64_t getClubIndexFromPerson(void *handle, uint64_t personAddress);
+static void readContract(void *handle, uint64_t personAddress, Player *player);
 static uint64_t getPersonAddressFromUid(const ProcessContext *processContext, uint64_t uid);
 static float getRatingPerPosition(const Player *player, PositionGrouped position);
 
@@ -167,7 +167,7 @@ Player getPlayer(
 	);
 	readFromMemory(handle, playerAddress + PLAYER_OFFSET_ATTRIBUTES, TRUE_ATTRIBUTE_COUNT, player.attributes);
 	readFromMemory(handle, playerAddress + PLAYER_OFFSET_POSITIONS, 15, player.positions);
-	player.clubIndex = getClubIndexFromPerson(handle, personAddress);
+	readContract(handle, personAddress, &player);
 	getSortedPositionRatings(&player);
 
 	// Normalise personality
@@ -331,20 +331,68 @@ uint8_t player_getAge(const Date dateOfBirth) {
 	return age;
 }
 
-static int64_t getClubIndexFromPerson(void *handle, const uint64_t personAddress) {
-	uint8_t pointer[8];
-	readFromMemory(handle, personAddress + PERSON_OFFSET_CONTRACTS, 8, pointer);
-	const uint64_t contractAddress = hexBytesToInt(pointer, 8);
+static void readContract(void *handle, const uint64_t personAddress, Player *player) {
+	uint8_t bytes[8];
+	readFromMemory(handle, personAddress + PERSON_OFFSET_CONTRACTS, 8, bytes);
+	const uint64_t contractAddress = hexBytesToInt(bytes, 8);
 	if (!contractAddress) {
-		return -1;
+		player->clubIndex = -1;
+		return;
 	}
 
-	readFromMemory(handle, contractAddress + CONTRACTS_OFFSET_TEAM, 8, pointer);
-	const uint64_t teamAddress = hexBytesToInt(pointer, 8);
-	readFromMemory(handle, teamAddress + TEAM_OFFSET_CLUB, 8, pointer);
-	const uint64_t clubAddress = hexBytesToInt(pointer, 8);
-	readFromMemory(handle, clubAddress + CLUB_OFFSET_ROW_ID, 4, pointer);
-	return (int64_t)hexBytesToInt(pointer, 4);
+	readFromMemory(handle, contractAddress + CONTRACTS_OFFSET_TEAM, 8, bytes);
+	const uint64_t teamAddress = hexBytesToInt(bytes, 8);
+	readFromMemory(handle, teamAddress + TEAM_OFFSET_CLUB, 8, bytes);
+	const uint64_t clubAddress = hexBytesToInt(bytes, 8);
+	readFromMemory(handle, clubAddress + CLUB_OFFSET_ROW_ID, 4, bytes);
+	player->clubIndex = (int64_t)hexBytesToInt(bytes, 4);
+
+	readFromMemory(handle, contractAddress + CONTRACTS_OFFSET_WEEKLY_WAGE, 4, bytes);
+	player->weeklyWage = (uint32_t)hexBytesToInt(bytes, 4);
+
+	// Stored in the same packed format as the in-game date
+	readFromMemory(handle, contractAddress + CONTRACTS_OFFSET_END_DATE, 4, bytes);
+	const DateTime end = game_parseDateTime(bytes);
+	player->contractEnd = (Date){.days = end.days, .year = end.year};
+
+	player->transferStatus = readByte(handle, contractAddress + CONTRACTS_OFFSET_TRANSFER_STATUS);
+}
+
+/**
+ * Footedness as FM labels it: either foot reaching 15 (on the 1-20 scale) makes a player two-footed,
+ * otherwise the stronger foot wins, and a weaker foot of 5 or less makes it "only".
+ */
+FootPreference player_getFoot(const Player *player) {
+	const uint8_t left = convertTo20Scale(player->attributes[ATTR_LEF]);
+	const uint8_t right = convertTo20Scale(player->attributes[ATTR_RIG]);
+
+	if ((left >= 15 && right >= 15) || left == right) {
+		return FOOT_EITHER;
+	}
+	if (left > right) {
+		return right <= 5 ? FOOT_LEFT_ONLY : FOOT_LEFT;
+	}
+
+	return left <= 5 ? FOOT_RIGHT_ONLY : FOOT_RIGHT;
+}
+
+const char *player_getFootName(const FootPreference foot) {
+	switch (foot) {
+		case FOOT_LEFT: return "Left";
+		case FOOT_LEFT_ONLY: return "Left only";
+		case FOOT_RIGHT: return "Right";
+		case FOOT_RIGHT_ONLY: return "Right only";
+		default: return "Either";
+	}
+}
+
+/** Writes "Forename Surname", or the common name when the player has one. */
+void player_getDisplayName(const Player *player, char *outName, const size_t size) {
+	if (player->commonName[0] == '\0') {
+		snprintf(outName, size, "%s %s", player->forename, player->surname);
+	} else {
+		snprintf(outName, size, "%s", player->commonName);
+	}
 }
 
 PositionWeights *getWeightsForPosition(const PositionGrouped position) {

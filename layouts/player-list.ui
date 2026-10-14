@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Yet another Scouting Tool - GTK4 GtkBuilder UI definition.
+  See: https://docs.gtk.org/gtk4/class.Builder.html
+-->
+<interface domain="player-list">
+	<!-- interface-name player-list.ui -->
+	<!-- interface-copyright SPDX-FileCopyrightText: © 2026 Phil Armstead <philarmstead@mailbox.org>
+SPDX-License-Identifier: GPL-3.0-or-later -->
+	<!-- interface-authors Phil Armstead <philarmstead@mailbox.org> -->
+	<requires lib="gtk" version="4.0"/>
+	<!-- Shared by the shortlist, similar players and upgrade finder windows, which fill it in code -->
+	<object class="GtkWindow" id="window:player-list">
+		<property name="default-width">720</property>
+		<property name="default-height">560</property>
+		<property name="title">Yet another Scouting Tool</property>
+		<style>
+			<class name="app-root"/>
+			<class name="player-list-root"/>
+		</style>
+		<child>
+			<object class="GtkBox">
+				<property name="orientation">vertical</property>
+				<property name="spacing">12</property>
+				<property name="margin-top">20</property>
+				<property name="margin-bottom">20</property>
+				<property name="margin-start">24</property>
+				<property name="margin-end">24</property>
+				<child>
+					<object class="GtkLabel" id="label:title">
+						<property name="halign">start</property>
+						<property name="xalign">0</property>
+						<style>
+							<class name="title-1"/>
+						</style>
+					</object>
+				</child>
+				<child>
+					<object class="GtkLabel" id="label:subtitle">
+						<property name="halign">start</property>
+						<property name="xalign">0</property>
+						<property name="wrap">true</property>
+						<style>
+							<class name="dim-label"/>
+						</style>
+					</object>
+				</child>
+				<child>
+					<object class="GtkBox" id="box:controls">
+						<property name="orientation">horizontal</property>
+						<property name="spacing">12</property>
+						<property name="visible">false</property>
+					</object>
+				</child>
+				<child>
+					<object class="GtkScrolledWindow">
+						<property name="vexpand">true</property>
+						<property name="hexpand">true</property>
+						<property name="hscrollbar-policy">automatic</property>
+						<property name="vscrollbar-policy">automatic</property>
+						<style>
+							<class name="player-grid-scroll"/>
+						</style>
+						<child>
+							<object class="GtkGrid" id="grid:players">
+								<property name="column-spacing">0</property>
+								<property name="row-spacing">0</property>
+								<property name="valign">start</property>
+								<style>
+									<class name="player-grid"/>
+								</style>
+							</object>
+						</child>
+					</object>
+				</child>
+			</object>
+		</child>
+	</object>
+</interface>

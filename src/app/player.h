@@ -13,3 +13,9 @@ Player getPlayerById(const ProcessContext *processContext, uint64_t uniqueId);
 PositionWeights *getWeightsForPosition(PositionGrouped position);
 void getSortedPositionRatings(Player *player);
 uint8_t player_getAge(Date dateOfBirth);
+FootPreference player_getFoot(const Player *player);
+const char *player_getFootName(FootPreference foot);
+
+// Long enough for "Forename Surname" at their maximum lengths
+#define PLAYER_DISPLAY_NAME_LENGTH (PERSON_FORENAME_LENGTH + PERSON_SURNAME_LENGTH + 2)
+void player_getDisplayName(const Player *player, char *outName, size_t size);

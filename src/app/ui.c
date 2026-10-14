@@ -6,6 +6,7 @@
 #include "app/cache.h"
 #include "app/config.h"
 #include "app/search-handler.h"
+#include "app/helpers/attributes.h"
 #include "app/helpers/date.h"
 #include "app/helpers/formatter.h"
 #include "app/helpers/vector.h"
@@ -23,6 +24,7 @@ static gboolean onWindowClose(GtkWidget *widget, gpointer userData);
 static void onFilterTagClick(GtkWidget *self, GtkEntryBuffer *buffer);
 static void onEditableFilterTagClick(GtkWidget *self, GtkEditable *buffer);
 static void onPositionFilterTagClick(GtkWidget *self, GtkCheckButton *button);
+static void onDropDownFilterTagClick(GtkWidget *self, GtkDropDown *dropDown);
 
 void ui_init(GtkApplication *app) {
 	ui_loadStylesheet("styles.css", GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -74,6 +76,50 @@ void ui_init(GtkApplication *app) {
 	buf->maxPA = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:pa:max")));
 	buf->minRating = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:rating:min")));
 	buf->maxRating = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:rating:max")));
+	buf->minValue = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:value:min")));
+	buf->maxValue = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:value:max")));
+	buf->minHomeReputation = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:reputation:home:min")));
+	buf->maxHomeReputation = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:reputation:home:max")));
+	buf->minCurrentReputation = gtk_entry_get_buffer(
+		GTK_ENTRY(gtk_builder_get_object(b, "entry:reputation:current:min"))
+	);
+	buf->maxCurrentReputation = gtk_entry_get_buffer(
+		GTK_ENTRY(gtk_builder_get_object(b, "entry:reputation:current:max"))
+	);
+	buf->minWorldReputation = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:reputation:world:min")));
+	buf->maxWorldReputation = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:reputation:world:max")));
+	buf->maxWage = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:wage:max")));
+	buf->contractMonths = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, "entry:contract:months")));
+
+	// Every attribute dropdown offers the same list: a placeholder, then each attribute by name
+	uint8_t sortedAttributes[ATTRIBUTE_COUNT];
+	attributes_getSortedByName(sortedAttributes);
+	FilterControls *controls = &gameContext.filterControls;
+	for (uint8_t i = 0; i < ATTRIBUTE_FILTER_COUNT; ++i) {
+		char id[48];
+		snprintf(id, sizeof(id), "entry:attribute:%d:min", i);
+		buf->minAttribute[i] = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, id)));
+		snprintf(id, sizeof(id), "entry:attribute:%d:max", i);
+		buf->maxAttribute[i] = gtk_entry_get_buffer(GTK_ENTRY(gtk_builder_get_object(b, id)));
+
+		snprintf(id, sizeof(id), "string-list:attribute:%d", i);
+		GtkStringList *list = GTK_STRING_LIST(gtk_builder_get_object(b, id));
+		gtk_string_list_append(list, "Any attribute");
+		for (uint8_t j = 0; j < ATTRIBUTE_COUNT; ++j) {
+			gtk_string_list_append(list, attributes_getName(sortedAttributes[j]));
+		}
+
+		snprintf(id, sizeof(id), "dropdown:attribute:%d", i);
+		controls->attribute[i] = GTK_DROP_DOWN(gtk_builder_get_object(b, id));
+		gtk_drop_down_set_selected(controls->attribute[i], 0);
+	}
+
+	controls->name = GTK_SEARCH_ENTRY(gtk_builder_get_object(b, "entry:name"));
+	controls->foot = GTK_DROP_DOWN(gtk_builder_get_object(b, "dropdown:foot"));
+	controls->transferStatus = GTK_DROP_DOWN(gtk_builder_get_object(b, "dropdown:transfer-status"));
+	controls->unattached = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:unattached"));
+	controls->fastLearner = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:fast-learner"));
+	controls->hotProspect = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:hot-prospect"));
 
 	// Cache check boxes
 	CheckBox *check = &gameContext.checkboxes;
@@ -183,10 +229,19 @@ static gboolean onWindowClose(GtkWidget *widget, gpointer userData) {
 
 void ui_refreshAllWindows(void) {
 	for (uint64_t i = 0; i < vector_length(gameContext.windows); i++) {
-		if (gameContext.windows[i].type == WINDOW_BEST_XI) {
-			ui_renderBestElevenWindow(gameContext.windows[i]);
-		} else if (gameContext.windows[i].type == WINDOW_PLAYER_INFO) {
-			ui_renderPlayerInfoWindow(gameContext.windows[i]);
+		const WindowContext context = gameContext.windows[i];
+		if (context.type == WINDOW_BEST_XI) {
+			ui_renderBestElevenWindow(context);
+		} else if (context.type == WINDOW_PLAYER_INFO) {
+			ui_renderPlayerInfoWindow(context);
+		} else if (context.type == WINDOW_SQUAD_DEPTH) {
+			ui_renderSquadDepthWindow(context);
+		} else if (context.type == WINDOW_SHORTLIST) {
+			ui_renderShortlistWindow(context);
+		} else if (context.type == WINDOW_SIMILAR_PLAYERS) {
+			ui_renderSimilarPlayersWindow(context);
+		} else if (context.type == WINDOW_UPGRADE_FINDER) {
+			ui_renderUpgradeFinderWindow(context);
 		} else if (
 			gameContext.windows[i].type == WINDOW_PLAYER_SEARCH &&
 			(gameContext.filterOptions.filterMask || gameContext.searchResults->data != NULL)
@@ -198,8 +253,7 @@ void ui_refreshAllWindows(void) {
 
 static bool hasPlayerWindow(void) {
 	for (uint64_t i = 0; i < vector_length(gameContext.windows); i++) {
-		const WindowType type = gameContext.windows[i].type;
-		if (type == WINDOW_BEST_XI || type == WINDOW_PLAYER_INFO) {
+		if (gameContext.windows[i].type != WINDOW_PLAYER_SEARCH) {
 			return true;
 		}
 	}
@@ -210,10 +264,51 @@ static bool hasPlayerWindow(void) {
 // `lookup` is NULL when the players themselves have not changed and only need drawing again.
 static void renderPlayerWindows(const PlayerLookup *lookup) {
 	for (uint64_t i = 0; i < vector_length(gameContext.windows); i++) {
-		if (gameContext.windows[i].type == WINDOW_BEST_XI) {
-			ui_rebindBestElevenWindow(gameContext.windows[i], lookup);
-		} else if (gameContext.windows[i].type == WINDOW_PLAYER_INFO) {
-			ui_rebindPlayerInfoWindow(gameContext.windows[i], lookup);
+		const WindowContext context = gameContext.windows[i];
+		switch (context.type) {
+			case WINDOW_BEST_XI:
+				ui_rebindBestElevenWindow(context, lookup);
+				break;
+			case WINDOW_PLAYER_INFO:
+				ui_rebindPlayerInfoWindow(context, lookup);
+				break;
+			case WINDOW_SQUAD_DEPTH:
+				ui_rebindSquadDepthWindow(context, lookup);
+				break;
+			case WINDOW_UPGRADE_FINDER:
+				ui_rebindUpgradeFinderWindow(context, lookup);
+				break;
+			// These two look their players up in the cache afresh whenever they render
+			case WINDOW_SHORTLIST:
+				ui_renderShortlistWindow(context);
+				break;
+			case WINDOW_SIMILAR_PLAYERS:
+				ui_renderSimilarPlayersWindow(context);
+				break;
+			default:
+				break;
+		}
+	}
+}
+
+/** Redraws everything that shows whether a player is shortlisted, after the shortlist changes. */
+void ui_refreshShortlistViews(void) {
+	for (uint64_t i = 0; i < vector_length(gameContext.windows); i++) {
+		const WindowContext context = gameContext.windows[i];
+		if (context.type == WINDOW_SHORTLIST) {
+			ui_renderShortlistWindow(context);
+		} else if (context.type == WINDOW_PLAYER_INFO) {
+			ui_renderPlayerInfoWindow(context);
+		}
+	}
+}
+
+/** Brings the search window forward, e.g. after a search was started from another window. */
+void ui_presentSearchWindow(void) {
+	for (uint64_t i = 0; i < vector_length(gameContext.windows); i++) {
+		if (gameContext.windows[i].type == WINDOW_PLAYER_SEARCH) {
+			gtk_window_present(GTK_WINDOW(gameContext.windows[i].window));
+			return;
 		}
 	}
 }
@@ -307,8 +402,22 @@ void ui_createNationalityFilterTag(const char *name, GtkEditable *buffer) {
 void ui_createPositionFilterTag(const char *name, GtkCheckButton *button) {
 	char textBuffer[16] = {0};
 	snprintf(textBuffer, sizeof(textBuffer), "Pos: %s", name);
-	const FilterTag tag = createFilterTag(textBuffer, true);
+	ui_createCheckFilterTag(textBuffer, button);
+}
+
+void ui_createCheckFilterTag(const char *text, GtkCheckButton *button) {
+	const FilterTag tag = createFilterTag(text, true);
 	g_signal_connect(tag.closeButton, "clicked", G_CALLBACK(onPositionFilterTagClick), button);
+}
+
+void ui_createEditableFilterTag(const char *text, GtkEditable *editable) {
+	const FilterTag tag = createFilterTag(text, true);
+	g_signal_connect(tag.closeButton, "clicked", G_CALLBACK(onEditableFilterTagClick), editable);
+}
+
+void ui_createDropDownFilterTag(const char *text, GtkDropDown *dropDown) {
+	const FilterTag tag = createFilterTag(text, true);
+	g_signal_connect(tag.closeButton, "clicked", G_CALLBACK(onDropDownFilterTagClick), dropDown);
 }
 
 void ui_clearFilterTags(void) {
@@ -354,6 +463,12 @@ static void onFilterTagClick(GtkWidget *self, GtkEntryBuffer *buffer) {
 static void onPositionFilterTagClick(GtkWidget *self, GtkCheckButton *button) {
 	(void)self;
 	gtk_check_button_set_active(button, FALSE);
+}
+
+// As above: resetting the dropdown re-runs the search, which rebuilds every tag.
+static void onDropDownFilterTagClick(GtkWidget *self, GtkDropDown *dropDown) {
+	(void)self;
+	gtk_drop_down_set_selected(dropDown, 0);
 }
 
 

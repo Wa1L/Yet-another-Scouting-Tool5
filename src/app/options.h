@@ -5,3 +5,4 @@
 
 void options_init(void);
 void options_shutdown(void);
+void options_saveColumns(void);

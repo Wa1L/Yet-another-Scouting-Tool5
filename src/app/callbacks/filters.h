@@ -11,6 +11,8 @@
 BUILDER_CALLBACK void callbacks_onFiltersClear(void);
 BUILDER_CALLBACK void callbacks_onFilterRun(void);
 BUILDER_CALLBACK void callbacks_onPositionToggled(GtkCheckButton *button, gpointer data);
+BUILDER_CALLBACK void callbacks_onFilterDropDownChanged(GObject *object, GParamSpec *pspec, gpointer data);
+BUILDER_CALLBACK void callbacks_onNameSearchChanged(GtkSearchEntry *entry, gpointer data);
 BUILDER_CALLBACK gboolean callbacks_onFiltersKeypress(
 	GtkEventControllerKey *controller,
 	guint keyval,

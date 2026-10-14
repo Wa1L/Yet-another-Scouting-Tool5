@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "callbacks.h"
+#include "app/player-snapshot.h"
 #include "app/player-table.h"
+#include "app/shortlist.h"
+#include "app/callbacks/best-eleven.h"
 #include "app/callbacks/club-search.h"
 #include "app/callbacks/filters.h"
 #include "app/callbacks/nationality-search.h"
+#include "app/callbacks/player.h"
+#include "app/helpers/vector.h"
 #include "core/logger.h"
 
 
@@ -25,6 +30,63 @@ void callbacks_init(void) {
 	nationalitySearch_init();
 }
 
+static const WindowContext *findWindowContext(const GtkWidget *window) {
+	for (uint64_t i = 0; i < vector_length(gameContext.windows); i++) {
+		if (gameContext.windows[i].window == window) {
+			return &gameContext.windows[i];
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * Shortcuts that belong to one kind of window. The search window's open the other views and find
+ * players; Player Info's act on the player it shows. Returns TRUE when the key was handled.
+ */
+static gboolean handleWindowShortcut(const WindowContext *context, const guint keyval, const gboolean primary) {
+	if (context == NULL) {
+		return FALSE;
+	}
+
+	const guint key = gdk_keyval_to_lower(keyval);
+
+	if (context->type == WINDOW_PLAYER_SEARCH) {
+		if (primary && key == GDK_KEY_f) {
+			gtk_widget_grab_focus(GTK_WIDGET(gameContext.filterControls.name));
+			return TRUE;
+		}
+		if (primary && key == GDK_KEY_b) {
+			callbacks_onShowBestEleven();
+			return TRUE;
+		}
+		if (primary && key == GDK_KEY_d) {
+			callbacks_onShowSquadDepth();
+			return TRUE;
+		}
+		if (primary && key == GDK_KEY_l) {
+			callbacks_onShowShortlist();
+			return TRUE;
+		}
+		if (primary && key == GDK_KEY_p) {
+			callbacks_onShowCurrentPlayer();
+			return TRUE;
+		}
+		// Enter on a result opens it, the way double-clicking does
+		if (!primary && (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter) && playerTable_hasFocus()) {
+			return playerTable_openSelected();
+		}
+	} else if (context->type == WINDOW_PLAYER_INFO) {
+		const PlayerSnapshot *snapshot = context->data;
+		if (primary && key == GDK_KEY_s && snapshot != NULL && snapshot->count > 0) {
+			shortlist_toggle(&snapshot->players[0]);
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 gboolean callbacks_onWindowKeypress(
 	GtkEventControllerKey *controller,
 	guint keyval,
@@ -37,6 +99,7 @@ gboolean callbacks_onWindowKeypress(
 	const gboolean alt = (state & GDK_ALT_MASK) != 0;
 
 #ifdef ARCH_MACOS
+	const gboolean primary = meta;
 	if (meta) {
 		if (keyval == GDK_KEY_q || keyval == GDK_KEY_Q) {
 			g_application_quit(G_APPLICATION(gameContext.app));
@@ -48,6 +111,7 @@ gboolean callbacks_onWindowKeypress(
 		}
 	}
 #else
+	const gboolean primary = ctrl;
 	if (alt && keyval == GDK_KEY_F4) {
 		g_application_quit(G_APPLICATION(gameContext.app));
 		return TRUE;
@@ -64,5 +128,5 @@ gboolean callbacks_onWindowKeypress(
 	(void)meta;
 	(void)alt;
 
-	return FALSE;
+	return handleWindowShortcut(findWindowContext(window), keyval, primary);
 }

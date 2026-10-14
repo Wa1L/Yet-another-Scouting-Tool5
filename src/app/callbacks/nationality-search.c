@@ -111,11 +111,18 @@ void callbacks_onNationalitySelected(
 
 	GtkWidget *child = gtk_list_box_row_get_child(row);
 	const uint8_t nationIndex = (uint8_t)GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "index"));
+	if (!nationalitySearch_select(nationIndex)) {
+		gtk_popover_popdown(datalist->popover);
+	}
+}
+
+/** Filters the search by a nationality, as if it had been picked from the nation search's list. */
+bool nationalitySearch_select(const uint8_t nationIndex) {
+	const SearchDatalist *datalist = gameContext.nationalityDatalist;
 	// The nations may have been republished since the list was built.
 	const Nation *nation = entities_getNation(nationIndex);
-	if (nation == NULL) {
-		gtk_popover_popdown(datalist->popover);
-		return;
+	if (nation == NULL || datalist == NULL) {
+		return false;
 	}
 
 	// Block the change handler while we update the text
@@ -142,4 +149,6 @@ void callbacks_onNationalitySelected(
 	// NOTE: this is the same as the on-enter handler
 	searchHandler_doSearch(true);
 	callbacks_updateFilterTags();
+
+	return true;
 }

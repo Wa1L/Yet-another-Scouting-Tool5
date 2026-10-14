@@ -26,5 +26,7 @@ typedef struct {
 typedef struct {
 	Formation *formations;
 	PositionWeights *weights;
+	uint16_t *columns; // Visible result table columns in display order; see player-table.c
+	bool columnsSet; // false means the file has no `columns` key, so the defaults apply
 	bool darkMode;
 } Options;

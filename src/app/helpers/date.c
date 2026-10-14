@@ -3,6 +3,10 @@
 
 #include "date.h"
 
+#include <stdio.h>
+
+
+extern GameContext gameContext;
 
 const char *date_getOrdinal(uint16_t day) {
 	if (day >= 11 && day <= 13) {
@@ -82,4 +86,25 @@ DayMonthYearTime date_prettify(const DateTime dateTime) {
 	}
 
 	return dayMonthYearTime;
+}
+
+/**
+ * Days from the current in-game date to `date`, negative once it has passed. Both dates are on the
+ * game's 365-day calendar, so this is exact to the day rather than an approximation.
+ */
+int32_t date_daysUntil(const Date date) {
+	return ((int32_t)date.year - (int32_t)gameContext.currentDate.year) * 365
+		+ (int32_t)date.days - (int32_t)gameContext.currentDate.days;
+}
+
+// Whole months until `date`, using an average month length; negative once it has passed.
+int32_t date_monthsUntil(const Date date) {
+	const int32_t days = date_daysUntil(date);
+	return (int32_t)((float)days / (365.f / 12.f));
+}
+
+/** Writes e.g. "30 Jun 2027". */
+void date_format(const Date date, char *outString, const size_t size) {
+	const DayMonthYearTime d = date_prettify((DateTime){.days = date.days, .year = date.year});
+	snprintf(outString, size, "%d %.3s %d", d.day, d.month, d.year);
 }

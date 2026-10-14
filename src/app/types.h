@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <gtk/gtk.h>
 
@@ -34,6 +35,15 @@
 #define FILTER_HAS_MAX_AGE (1 << 16)
 #define FILTER_HAS_NATIONALITY (1 << 17)
 #define FILTER_HAS_POSITION (1 << 18)
+#define FILTER_HAS_NAME (1 << 19)
+#define FILTER_HAS_MAX_WAGE (1 << 20)
+#define FILTER_HAS_CONTRACT_EXPIRY (1 << 21)
+#define FILTER_HAS_TRANSFER_STATUS (1 << 22)
+#define FILTER_HAS_UNATTACHED (1 << 23)
+#define FILTER_HAS_FOOT (1 << 24)
+#define FILTER_HAS_FAST_LEARNER (1 << 25)
+#define FILTER_HAS_HOT_PROSPECT (1 << 26)
+#define FILTER_HAS_ATTRIBUTE (1 << 27)
 
 #define POSITION_MASK_GK (1 << 0)
 #define POSITION_MASK_DL (1 << 1)
@@ -50,14 +60,49 @@
 #define POSITION_MASK_AMR (1 << 12)
 #define POSITION_MASK_ST (1 << 13)
 
+// Indices line up with the entries of the dropdowns in player-search.ui
+typedef enum {
+	FOOT_FILTER_ANY,
+	FOOT_FILTER_LEFT,
+	FOOT_FILTER_RIGHT,
+	FOOT_FILTER_EITHER,
+} FootFilter;
+
+typedef enum {
+	TRANSFER_FILTER_ANY,
+	TRANSFER_FILTER_LISTED,
+	TRANSFER_FILTER_LOAN_LISTED,
+	TRANSFER_FILTER_EITHER,
+} TransferStatusFilter;
+
+/** Bounds are on the 1-20 scale; 0 means that side is unbounded. */
 typedef struct {
+	uint8_t attribute;
+	uint8_t min;
+	uint8_t max;
+} AttributeFilter;
+
+// Long enough for any name we read, after case and accent folding
+#define NAME_SEARCH_LENGTH 72
+
+typedef struct {
+	char name[NAME_SEARCH_LENGTH]; // Folded with text_fold()
+	AttributeFilter attributes[ATTRIBUTE_FILTER_COUNT];
 	int64_t clubIndex;
 	uint32_t filterMask; // 1 bit to represent the presence of each filter
 	float minRating;
 	float maxRating;
 	uint32_t minValue;
 	uint32_t maxValue;
+	uint32_t maxWage; // Per week
+	uint16_t minHomeReputation;
+	uint16_t maxHomeReputation;
+	uint16_t minCurrentReputation;
+	uint16_t maxCurrentReputation;
+	uint16_t minWorldReputation;
+	uint16_t maxWorldReputation;
 	uint16_t positions; // Masked, one bit per position
+	uint16_t contractMonths;
 	uint8_t minAge;
 	uint8_t maxAge;
 	uint8_t minCA;
@@ -65,6 +110,8 @@ typedef struct {
 	uint8_t minPA;
 	uint8_t maxPA;
 	uint8_t nationalityIndex;
+	uint8_t foot; // FootFilter
+	uint8_t transferStatus; // TransferStatusFilter
 } FilterOptions;
 
 typedef struct {
@@ -88,6 +135,10 @@ typedef enum {
 	WINDOW_PLAYER_SEARCH,
 	WINDOW_PLAYER_INFO,
 	WINDOW_BEST_XI,
+	WINDOW_SQUAD_DEPTH,
+	WINDOW_SHORTLIST,
+	WINDOW_SIMILAR_PLAYERS,
+	WINDOW_UPGRADE_FINDER,
 } WindowType;
 
 
@@ -101,6 +152,7 @@ typedef struct {
 typedef struct {
 	CheckBox checkboxes;
 	FilterBuffer filterBuffer;
+	FilterControls filterControls;
 	FilterOptions filterOptions;
 	char gameVersion[GAME_STATUS_STRING_BUFFER_SIZE];
 	Options options;

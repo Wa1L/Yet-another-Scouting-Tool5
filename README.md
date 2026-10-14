@@ -18,12 +18,21 @@ the [Steam version of Football Manager 24](https://store.steampowered.com/app/22
 ### Search for players
 
 - Search based on a number of factors:
+	- name (accents are ignored, so "modric" finds Modrić)
 	- age
 	- position
 	- nationality
 	- current/potential ability
 	- rating
 	- club
+	- value
+	- home, current and world reputation
+	- contract: maximum wage, expiring within a number of months, transfer or loan listed, unattached
+	- preferred foot
+	- fast learners and hot prospects
+	- up to three attributes, hidden and personality attributes included (e.g. professionalism of 15 or more)
+- Choose which columns the results show, including any attribute, and in what order, from the **Columns** button. Extra
+  columns include preferred foot, weekly wage, contract end date and a value-for-money score
 
 ![Screenshot of player search](docs/player-search.png?v=1)
 
@@ -32,16 +41,43 @@ the [Steam version of Football Manager 24](https://store.steampowered.com/app/22
 - See all the attributes for any player (including hidden and personality) as well as a competency rating for all
   comfortable positions
 	- These competencies can be customised with either universal or per-position weights
+- See a player's wage, contract end date and transfer status
+- Click a player's club or flag to search for that club's or nation's players
+- Find players with a similar attribute profile, optionally younger or cheaper
+
+### Track players
+
+- Shortlist players from their Player Info window. The shortlist shows how each player's CA, PA, rating, value and
+  attributes have changed since you added them, and is saved to **shortlist.tsv** next to the app
 
 ![Screenshot of player info](docs/player-info.png?v=1)
 
 ### Analyse a squad
 
 - Assemble the best XI from all players in search results, for a given formation, based on player competency ratings
+	- Show the bench: the next-best option for every position
+	- Find upgrades: the best players outside your search results who would improve each position, within a budget
+	  and age limit
 - View squad depth, outlining the strength of your options across all positions
+	- The squad planner flags positions with no cover, ageing options, expiring contracts or a weak first choice
 
 ![Screenshot of best XI](docs/best-xi.png?v=1)
 ![Screenshot of squad depth](docs/squad-depth.png?v=1)
+
+### Keyboard shortcuts
+
+| Shortcut  | Action                                    |
+|-----------|-------------------------------------------|
+| Ctrl+F    | Search by name                            |
+| Enter     | Open the selected result                  |
+| Ctrl+P    | Open the player currently shown in-game   |
+| Ctrl+B    | Best XI                                   |
+| Ctrl+D    | Squad depth                               |
+| Ctrl+L    | Shortlist                                 |
+| Ctrl+S    | Shortlist (or un-shortlist) a player, from their Player Info window |
+| Ctrl+W    | Close the window                          |
+
+On macOS, use Cmd in place of Ctrl.
 
 ## Options
 

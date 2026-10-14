@@ -20,7 +20,8 @@
 	.personAddress = 0xa06cf440, \
 	.playerAddress = 0xa06cf1c8, \
 	.guideValue = 252086992, \
-	.annualWage = 0, \
+	.weeklyWage = 350000, \
+	.contractEnd = {.days = 181, .year = 2027}, \
 	.clubIndex = 1125, \
 	.sharpness = 10000, \
 	.fatigue = 13, \
@@ -48,7 +49,9 @@
 	.personAddress = 0xa06df440, \
 	.playerAddress = 0xa06df1c8, \
 	.guideValue = 300000000, \
-	.annualWage = 35000000, \
+	.weeklyWage = 675000, \
+	.contractEnd = {.days = 181, .year = 2029}, \
+	.transferStatus = TRANSFER_STATUS_LISTED, \
 	.clubIndex = 1125, \
 	.sharpness = 10000, \
 	.fatigue = -7000, \
@@ -76,7 +79,9 @@
 	.personAddress = 0xa06df441, \
 	.playerAddress = 0xa06df1c9, \
 	.guideValue = 123456789, \
-	.annualWage = 15000000, \
+	.weeklyWage = 288000, \
+	.contractEnd = {.days = 365, .year = 2026}, \
+	.transferStatus = TRANSFER_STATUS_LOAN_LISTED, \
 	.clubIndex = 1125, \
 	.sharpness = 8000, \
 	.fatigue = 0, \

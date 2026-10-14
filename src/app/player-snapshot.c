@@ -125,7 +125,11 @@ void playerLookup_destroy(PlayerLookup *lookup) {
 	lookup->mask = 0;
 }
 
-static const Player *findPlayer(const PlayerLookup *lookup, const uint32_t uid) {
+const Player *playerLookup_find(const PlayerLookup *lookup, const uint32_t uid) {
+	if (lookup == NULL || lookup->slots == NULL) {
+		return NULL;
+	}
+
 	uint32_t slot = uid * 2654435761u & lookup->mask;
 	while (lookup->slots[slot] != NULL) {
 		if (lookup->slots[slot]->uid == uid) {
@@ -144,7 +148,7 @@ void playerSnapshot_refresh(PlayerSnapshot *snapshot, const PlayerLookup *lookup
 	}
 
 	for (uint32_t i = 0; i < snapshot->count; ++i) {
-		const Player *current = findPlayer(lookup, snapshot->players[i].uid);
+		const Player *current = playerLookup_find(lookup, snapshot->players[i].uid);
 		if (current != NULL) {
 			snapshot->players[i] = *current;
 		}

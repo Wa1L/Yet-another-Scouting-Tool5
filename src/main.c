@@ -10,6 +10,7 @@
 #include "app/maths.h"
 #include "app/options.h"
 #include "app/player-table.h"
+#include "app/shortlist.h"
 #include "app/ui.h"
 #include "app/helpers/formatter.h"
 #include "app/helpers/game.h"
@@ -44,6 +45,7 @@ int main(const int argc, char **argv) {
 	g_object_unref(app);
 
 	options_shutdown();
+	shortlist_shutdown();
 	injuryNames_destroy();
 	logger_shutdown();
 
@@ -58,6 +60,7 @@ static void activate(GtkApplication *app) {
 	gtk_window_set_default_icon_name("com.philarmstead.yast");
 
 	options_init();
+	shortlist_init();
 	formatter_init();
 	icons_init();
 	ui_init(app);

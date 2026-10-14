@@ -117,22 +117,29 @@ add_executable(yast
 	src/app/player.c
 	src/app/search.c
 	src/app/search-handler.c
+	src/app/shortlist.c
 	src/app/ui.c
 	src/app/callbacks/best-eleven.c
 	src/app/callbacks/club-search.c
 	src/app/callbacks/filters.c
 	src/app/callbacks/nationality-search.c
 	src/app/callbacks/player.c
+	src/app/helpers/attributes.c
 	src/app/helpers/date.c
 	src/app/helpers/file-watcher.c
 	src/app/helpers/formatter.c
 	src/app/helpers/game.c
 	src/app/helpers/icons.c
 	src/app/helpers/ratings.c
+	src/app/helpers/text.c
 	src/app/helpers/vector-shared-pointer.c
 	src/app/ui/best-eleven.c
 	src/app/ui/player-info.c
+	src/app/ui/player-list.c
+	src/app/ui/shortlist.c
+	src/app/ui/similar-players.c
 	src/app/ui/squad-depth.c
+	src/app/ui/upgrade-finder.c
 	src/core/logger.c
 )
 
@@ -227,6 +234,12 @@ target_compile_definitions(yast PRIVATE
 )
 
 target_link_libraries(yast PRIVATE PkgConfig::GTK4)
+
+# libm is a separate library on glibc and is not always pulled in transitively by GTK
+find_library(MATH_LIBRARY m)
+if (MATH_LIBRARY)
+	target_link_libraries(yast PRIVATE ${MATH_LIBRARY})
+endif ()
 
 # Export runtime symbols on Linux so GtkBuilder can find G_MODULE_EXPORT callbacks
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")

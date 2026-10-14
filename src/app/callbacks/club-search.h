@@ -9,6 +9,7 @@
 
 
 void clubSearch_init(void);
+bool clubSearch_select(int64_t clubIndex);
 void callbacks_OnClubNameChange(GtkEditable *editable, SearchDatalist *dataList);
 void callbacks_onClubNameSelected(
 	const GtkListBox *box,

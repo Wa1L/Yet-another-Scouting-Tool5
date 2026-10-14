@@ -191,6 +191,18 @@ headerbar {
 	background-color: var(--background-colour-button-secondary-hover);
 }
 
+.columns-button > button {
+	background-color: var(--background-colour-button-secondary);
+	border: 1px solid var(--border-colour-primary-lighter);
+	border-radius: var(--border-radius-s);
+	color: var(--colour-primary);
+	padding: 2px 8px;
+}
+
+.columns-button > button:hover {
+	background-color: var(--background-colour-button-secondary-hover);
+}
+
 .sidebar-section-header {
 	border-bottom: 1px solid var(--border-colour-subtle);
 	padding: 8px 2px;
@@ -266,6 +278,44 @@ headerbar {
 .quality-label {
 	color: var(--colour-primary);
 	min-width: 44px;
+}
+
+.quality-label-wide {
+	color: var(--colour-primary);
+	min-width: 76px;
+}
+
+.sidebar-scroll {
+	background-color: var(--background-colour-primary-light);
+}
+
+.filter-section {
+	padding: 2px 0;
+}
+
+.filter-section > title {
+	padding: 4px 0;
+}
+
+.sidebar-dropdown > button {
+	background-color: var(--background-colour-primary-lighter);
+	border: 1px solid var(--border-colour-primary-lighter);
+	border-radius: var(--border-radius-s);
+	min-height: 20px;
+	padding: 0 4px;
+}
+
+.sidebar-dropdown label {
+	font-size: 12px;
+	font-weight: normal;
+}
+
+.sidebar-check {
+	color: var(--colour-primary);
+}
+
+.columns-menu {
+	padding: 4px 8px 8px 8px;
 }
 
 .quality-dash {
@@ -546,4 +596,108 @@ headerbar {
 .rating-label {
 	color: var(--colour-potential-ability);
 	font-weight: 600;
+}
+
+.contract-expiring {
+	color: var(--colour-warning);
+	font-weight: 600;
+}
+
+.clickable:hover {
+	text-decoration: underline;
+}
+
+/** Player info additions */
+.player-contract {
+	color: var(--colour-primary-dark);
+}
+
+.pill-transfer {
+	background-color: var(--background-colour-pill-transfer);
+	border: 1px solid var(--border-colour-pill-transfer);
+	border-radius: 999px;
+	color: var(--colour-pill-transfer);
+	font-weight: 600;
+	padding: 3px 8px;
+}
+
+.tracking-summary {
+	background-color: var(--background-colour-panel);
+	border-radius: var(--border-radius-m);
+	color: var(--colour-primary);
+	padding: 8px 12px;
+}
+
+/** Best XI additions */
+.best-eleven-root .bench-heading {
+	border-top: 1px solid var(--border-colour-primary-lighter);
+	color: var(--colour-heading);
+	margin-top: 8px;
+	padding-top: 12px;
+}
+
+.upgrade-hint {
+	color: var(--colour-primary-dark);
+}
+
+/** Squad planner */
+.squad-planner {
+	background: var(--background-colour-card);
+	border: 1px solid var(--border-colour-primary-lighter);
+	border-radius: 6px;
+	padding: 10px 12px;
+}
+
+.planner-position {
+	color: var(--colour-heading);
+	font-weight: 800;
+}
+
+/** Player lists: shortlist, similar players and upgrade finder */
+.player-grid-heading {
+	background: var(--background-colour-header);
+	color: var(--colour-heading);
+	font-weight: 600;
+	padding: 8px 10px;
+}
+
+.player-grid-cell {
+	border-bottom: 1px solid var(--border-colour-row);
+	min-height: 32px;
+	padding: 4px 10px;
+}
+
+.player-grid-cell--alternate {
+	background-color: var(--background-colour-row-alternate);
+}
+
+.player-grid-name {
+	color: var(--colour-emphasis);
+	font-size: 1.1em;
+}
+
+.player-grid-group {
+	color: var(--colour-primary);
+	font-size: 1.1em;
+	padding: 14px 10px 6px 10px;
+}
+
+.player-grid-message {
+	color: var(--colour-primary-darker);
+	padding: 8px 10px;
+}
+
+.icon-btn {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	color: var(--colour-primary-darker);
+	min-height: 0;
+	min-width: 0;
+	padding: 2px 6px;
+}
+
+.icon-btn:hover {
+	background-color: var(--background-colour-button-secondary-hover);
+	color: var(--colour-primary);
 }
