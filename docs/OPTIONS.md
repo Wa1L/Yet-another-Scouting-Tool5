@@ -1,12 +1,22 @@
 Options
 ===
 
-These are the available options, their default values and a brief description of what they do. The options file is "hot
+Most of these can be changed from the app's **Settings** window, which saves them to this file for you. These are the
+available options, their default values and a brief description of what they do. The options file is "hot
 reloadable" in this app, meaning changes will be reflected upon saving with no restart necessary.
 
 ### Dark mode
 
 Set to `true` to enable dark mode. **Default value** is `dark-mode: false`
+
+### My club
+
+The full name of the club you manage, as the game spells it. It powers the My Squad view and the "Likely to join my
+club" search filter. Set it from the Settings window rather than by hand. For example:
+
+```
+my-club: "Real Madrid Club de Fútbol"
+```
 
 ### Columns
 

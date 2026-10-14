@@ -29,6 +29,7 @@
 	.homeReputation = 8550, \
 	.currentReputation = 9541, \
 	.worldReputation = 10000, \
+	.teamReputation = 9800, \
 	.positions = {1, 1, 1, 1, 1, 1, 16, 1, 10, 20, 1, 15, 19, 1, 1 }, \
 	.age = 24, \
 	.ca = 190, \
@@ -59,6 +60,7 @@
 	.homeReputation = 10000, \
 	.currentReputation = 10000, \
 	.worldReputation = 10000, \
+	.teamReputation = 9800, \
 	.positions = {1, 1, 1, 1, 1, 1, 20, 1, 20, 20, 20, 20, 20, 1, 1 }, \
 	.age = 17, \
 	.ca = 190, \
@@ -89,6 +91,7 @@
 	.homeReputation = 6000, \
 	.currentReputation = 8000, \
 	.worldReputation = 4000, \
+	.teamReputation = 9800, \
 	.positions = {20, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, \
 	.age = 24, \
 	.ca = 168, \

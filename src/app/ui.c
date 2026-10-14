@@ -118,6 +118,7 @@ void ui_init(GtkApplication *app) {
 	controls->foot = GTK_DROP_DOWN(gtk_builder_get_object(b, "dropdown:foot"));
 	controls->transferStatus = GTK_DROP_DOWN(gtk_builder_get_object(b, "dropdown:transfer-status"));
 	controls->unattached = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:unattached"));
+	controls->likelyToJoin = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:likely-to-join"));
 	controls->fastLearner = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:fast-learner"));
 	controls->hotProspect = GTK_CHECK_BUTTON(gtk_builder_get_object(b, "checkbox:hot-prospect"));
 
@@ -242,6 +243,8 @@ void ui_refreshAllWindows(void) {
 			ui_renderSimilarPlayersWindow(context);
 		} else if (context.type == WINDOW_UPGRADE_FINDER) {
 			ui_renderUpgradeFinderWindow(context);
+		} else if (context.type == WINDOW_SETTINGS) {
+			ui_renderSettingsWindow(context);
 		} else if (
 			gameContext.windows[i].type == WINDOW_PLAYER_SEARCH &&
 			(gameContext.filterOptions.filterMask || gameContext.searchResults->data != NULL)
@@ -284,6 +287,10 @@ static void renderPlayerWindows(const PlayerLookup *lookup) {
 				break;
 			case WINDOW_SIMILAR_PLAYERS:
 				ui_renderSimilarPlayersWindow(context);
+				break;
+			// Only the club label: re-rendering the editors would lose unsaved changes
+			case WINDOW_SETTINGS:
+				ui_rerenderSettingsClub(context);
 				break;
 			default:
 				break;

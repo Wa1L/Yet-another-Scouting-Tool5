@@ -701,3 +701,28 @@ headerbar {
 	background-color: var(--background-colour-button-secondary-hover);
 	color: var(--colour-primary);
 }
+
+/** Settings */
+.settings-page {
+	padding: 20px 24px;
+}
+
+.settings-hint {
+	color: var(--colour-primary-dark);
+}
+
+.settings-value {
+	color: var(--colour-emphasis);
+	font-size: 1.2em;
+	font-weight: 700;
+}
+
+.settings-list {
+	background: var(--background-colour-card);
+	border: 1px solid var(--border-colour-primary-lighter);
+	border-radius: var(--border-radius-s);
+}
+
+.settings-list row {
+	padding: 6px 10px;
+}

@@ -1,0 +1,65 @@
+# Builds the Windows installer and zip (see "Packaging a Windows build for distribution" in
+# docs/DEVELOPMENT.md) and attaches them to a GitHub release when it is published. It can also be
+# run by hand from the Actions tab, in which case the files are kept as a workflow artifact instead.
+name: Windows release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-gtk4
+            mingw-w64-x86_64-librsvg
+            mingw-w64-x86_64-nsis
+
+      # config.h is local configuration and not committed; the defaults read the real game
+      - name: Configure
+        run: |
+          cp src/app/config.default.h src/app/config.h
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package
+        run: |
+          cmake --build build --target package
+          ls build/*-setup.exe build/*-windows-x64.zip
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            build/*-setup.exe
+            build/*-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem build -File | Where-Object { $_.Name -like '*-setup.exe' -or $_.Name -like '*-windows-x64.zip' }
+          gh release upload "${{ github.event.release.tag_name }}" $files.FullName --clobber --repo "${{ github.repository }}"

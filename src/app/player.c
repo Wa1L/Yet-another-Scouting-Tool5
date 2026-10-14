@@ -342,6 +342,8 @@ static void readContract(void *handle, const uint64_t personAddress, Player *pla
 
 	readFromMemory(handle, contractAddress + CONTRACTS_OFFSET_TEAM, 8, bytes);
 	const uint64_t teamAddress = hexBytesToInt(bytes, 8);
+	readFromMemory(handle, teamAddress + TEAM_OFFSET_REPUTATION, 2, bytes);
+	player->teamReputation = (uint16_t)hexBytesToInt(bytes, 2);
 	readFromMemory(handle, teamAddress + TEAM_OFFSET_CLUB, 8, bytes);
 	const uint64_t clubAddress = hexBytesToInt(bytes, 8);
 	readFromMemory(handle, clubAddress + CLUB_OFFSET_ROW_ID, 4, bytes);

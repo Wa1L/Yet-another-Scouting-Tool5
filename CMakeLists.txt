@@ -112,6 +112,7 @@ add_executable(yast
 	src/app/cache.c
 	src/app/options.c
 	src/app/injury-names.c
+	src/app/my-club.c
 	src/app/player-snapshot.c
 	src/app/player-table.c
 	src/app/player.c
@@ -136,6 +137,7 @@ add_executable(yast
 	src/app/ui/best-eleven.c
 	src/app/ui/player-info.c
 	src/app/ui/player-list.c
+	src/app/ui/settings.c
 	src/app/ui/shortlist.c
 	src/app/ui/similar-players.c
 	src/app/ui/squad-depth.c

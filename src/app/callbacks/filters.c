@@ -3,6 +3,7 @@
 
 #include "filters.h"
 #include "app/entities.h"
+#include "app/my-club.h"
 #include "app/player-table.h"
 #include "app/search-handler.h"
 #include "app/ui.h"
@@ -148,6 +149,12 @@ static void createAdditionalFilterTags(const FilterOptions options, const Filter
 	}
 	if (mask & FILTER_HAS_UNATTACHED) {
 		ui_createCheckFilterTag("Unattached", controls->unattached);
+	}
+	if (mask & FILTER_HAS_LIKELY_TO_JOIN) {
+		ui_createCheckFilterTag(
+			myClub_getIndex() >= 0 ? "Likely to join my club" : "Likely to join: set your club in Settings",
+			controls->likelyToJoin
+		);
 	}
 	if (mask & FILTER_HAS_FAST_LEARNER) {
 		ui_createCheckFilterTag("Fast learner", controls->fastLearner);

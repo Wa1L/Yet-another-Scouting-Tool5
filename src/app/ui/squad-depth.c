@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "app/entities.h"
+#include "app/my-club.h"
 #include "app/player.h"
 #include "app/ui.h"
 #include "app/helpers/date.h"
@@ -127,7 +128,12 @@ static void appendContractWarning(GtkBox *planner, const char *position, const P
  * understudy who are both ageing, either of them out of contract within a year, and a first choice
  * well below the standard of the rest of the selected positions.
  */
-static void renderPlanner(GtkBox *planner, const PositionDepth *depths, const uint32_t depthCount) {
+static void renderPlanner(
+	GtkBox *planner,
+	const PositionDepth *depths,
+	const uint32_t depthCount,
+	const bool isMySquad
+) {
 	GtkWidget *child;
 	while ((child = gtk_widget_get_first_child(GTK_WIDGET(planner))) != NULL) {
 		gtk_box_remove(planner, child);
@@ -152,7 +158,11 @@ static void renderPlanner(GtkBox *planner, const PositionDepth *depths, const ui
 		const char *position = positionCodeNames[depth->position];
 
 		if (depth->count == 0) {
-			appendPlannerRow(planner, position, "Nobody in your search results can play here.");
+			appendPlannerRow(
+				planner,
+				position,
+				isMySquad ? "Nobody in your squad can play here." : "Nobody in your search results can play here."
+			);
 			continue;
 		}
 
@@ -207,18 +217,71 @@ static void renderPlanner(GtkBox *planner, const PositionDepth *depths, const ui
 	}
 }
 
+/**
+ * The squad of the user's club, i.e. everyone in the cache whose contract is with it, with the
+ * planner. Unlike the search-results version it follows the club rather than a fixed set of players,
+ * so signings and departures show up whenever the cache is replaced.
+ */
+static bool fillMySquad(PlayerSnapshot *snapshot) {
+	const int64_t clubIndex = myClub_getIndex();
+
+	uint32_t *playerIds = NULL;
+	for (uint32_t i = 0; clubIndex >= 0 && i < gameContext.playerCount; ++i) {
+		if (gameContext.players[i].clubIndex == clubIndex) {
+			vector_push(playerIds, i);
+		}
+	}
+	playerSnapshot_replace(snapshot, playerIds, vector_length(playerIds));
+	vector_free(playerIds);
+
+	return clubIndex >= 0;
+}
+
+static bool isMySquadWindow(const WindowContext context) {
+	return g_object_get_data(G_OBJECT(context.window), "squad-depth:my-squad") != NULL;
+}
+
+static void openSquadDepthWindow(PlayerSnapshot *snapshot, const bool isMySquad);
+
 void ui_createSquadDepthWindow(void) {
 	// The window works from its own copy of the results: the indices point into a buffer the cache
 	// is free to replace, and the players themselves are re-matched by uid after every publish.
 	const SharedPointer *results = gameContext.searchResults;
 	const uint32_t *playerIds = results != NULL ? results->data : NULL;
 	PlayerSnapshot *snapshot = playerSnapshot_create(playerIds, playerIds != NULL ? vector_length(playerIds) : 0);
-	if (snapshot == NULL) {
+	if (snapshot != NULL) {
+		openSquadDepthWindow(snapshot, false);
+	}
+}
+
+void ui_createMySquadWindow(void) {
+	if (myClub_getIndex() < 0) {
+		// Nothing to show until we know the club; the settings window is where it is chosen
+		ui_createSettingsWindow();
 		return;
 	}
 
+	PlayerSnapshot *snapshot = playerSnapshot_create(NULL, 0);
+	if (snapshot != NULL) {
+		fillMySquad(snapshot);
+		openSquadDepthWindow(snapshot, true);
+	}
+}
+
+static void setMySquadTitle(const WindowContext context) {
+	const Club *club = entities_getClub(myClub_getIndex());
+	char title[CLUB_SHORT_NAME_LENGTH + 16];
+	snprintf(title, sizeof(title), "My Squad · %s", club != NULL ? club->shortName : "no club set");
+	gtk_label_set_text(GTK_LABEL(gtk_builder_get_object(context.builder, "label:title")), title);
+}
+
+static void openSquadDepthWindow(PlayerSnapshot *snapshot, const bool isMySquad) {
 	const WindowContext context = openWindow("squad-depth", "window:squad-depth", WINDOW_SQUAD_DEPTH, snapshot);
 	g_object_set_data_full(G_OBJECT(context.window), "squad-depth:players", snapshot, playerSnapshot_free);
+	if (isMySquad) {
+		g_object_set_data(G_OBJECT(context.window), "squad-depth:my-squad", GINT_TO_POINTER(1));
+		setMySquadTitle(context);
+	}
 
 	WindowContext *cbContext = g_new(WindowContext, 1);
 	*cbContext = context; // copy the two pointers
@@ -245,6 +308,12 @@ void ui_createSquadDepthWindow(void) {
 }
 
 void ui_renderSquadDepthWindow(const WindowContext context) {
+	if (isMySquadWindow(context)) {
+		// The club may have changed in settings, so the squad is looked up again
+		fillMySquad(context.data);
+		setMySquadTitle(context);
+	}
+
 	const PlayerSnapshot *snapshot = context.data;
 	Player *players = snapshot != NULL ? snapshot->players : NULL;
 	const uint32_t playerCount = snapshot != NULL ? snapshot->count : 0;
@@ -262,6 +331,11 @@ void ui_renderSquadDepthWindow(const WindowContext context) {
  * click gestures pointing at live entries.
  */
 void ui_rebindSquadDepthWindow(const WindowContext context, const PlayerLookup *lookup) {
+	if (isMySquadWindow(context)) {
+		ui_renderSquadDepthWindow(context);
+		return;
+	}
+
 	playerSnapshot_refresh(context.data, lookup);
 	renderSquadDepthGrids(context);
 }
@@ -462,5 +536,10 @@ static void renderSquadDepthGrids(const WindowContext context) {
 
 	g_free(depthRows);
 
-	renderPlanner(GTK_BOX(gtk_builder_get_object(b, "box:planner")), plannedPositions, plannedCount);
+	renderPlanner(
+		GTK_BOX(gtk_builder_get_object(b, "box:planner")),
+		plannedPositions,
+		plannedCount,
+		isMySquadWindow(context)
+	);
 }

@@ -125,6 +125,7 @@ typedef struct {
 	uint16_t homeReputation;
 	uint16_t currentReputation;
 	uint16_t worldReputation;
+	uint16_t teamReputation; // Of the team the player's contract is with; 0 when unattached
 	uint8_t selectedRatingIndex;
 	uint8_t positions[15];
 	uint8_t age;

@@ -375,6 +375,16 @@ static void applyOption(const char *key, const char *value) {
 		return;
 	}
 
+	if (!strcmp(key, "my-club")) {
+		const size_t length = strlen(value);
+		if (length >= 2 && value[0] == '"' && value[length - 1] == '"') {
+			snprintf(gameContext.options.myClub, sizeof(gameContext.options.myClub), "%.*s", (int)(length - 2), value + 1);
+		} else {
+			snprintf(gameContext.options.myClub, sizeof(gameContext.options.myClub), "%s", value);
+		}
+		return;
+	}
+
 	LOG_WARN("Unrecognised option key '%s'", key);
 }
 
@@ -515,53 +525,59 @@ static void setDefaults(void) {
 	vector_push(options->weights[1].weights, ((RatingWeight){.attribute = ATTR_INJ, .weight = -4.8f}));
 }
 
-// Writes the current in-memory defaults to a new options file so the user has one to edit.
-// The output is intentionally in the same form the parser reads back, so it round-trips.
-static void writeDefaultOptions(const char *path) {
-	FILE *file = fopen(path, "w");
-	if (!file) {
-		LOG_WARN("Could not create default options file '%s'; continuing with in-memory defaults", path);
-		return;
-	}
-
+static void appendFormationsBlock(GString *output) {
 	const Options *options = &gameContext.options;
-
-	fputs("# Yet another Scouting Tool options\n", file);
-	fprintf(file, "dark-mode: %s\n", options->darkMode ? "true" : "false");
-
-	fputs("formations:\n", file);
+	g_string_append(output, "formations:\n");
 	for (uint64_t i = 0; i < vector_length(options->formations); ++i) {
-		fprintf(file, "  - name: \"%s\"\n", options->formations[i].name);
-		fputs("    positions:", file);
+		g_string_append_printf(output, "  - name: \"%s\"\n", options->formations[i].name);
+		g_string_append(output, "    positions:");
 		for (uint8_t j = 0; j < FORMATION_POSITION_COUNT; ++j) {
-			fprintf(file, " %s", positionCodeNames[options->formations[i].positions[j]]);
+			g_string_append_printf(output, " %s", positionCodeNames[options->formations[i].positions[j]]);
 		}
-		fputc('\n', file);
+		g_string_append_c(output, '\n');
 	}
+}
 
-	fputs("ratings:\n", file);
+static void appendRatingsBlock(GString *output) {
+	const Options *options = &gameContext.options;
+	g_string_append(output, "ratings:\n");
 	for (uint64_t i = 0; i < vector_length(options->weights); ++i) {
-		fprintf(file, "  - position: %s\n", positionGroupedCodes[options->weights[i].position]);
-		fprintf(file, "    scale: %.2f\n", options->weights[i].scale);
-		fputs("    weights:\n", file);
+		g_string_append_printf(output, "  - position: %s\n", positionGroupedCodes[options->weights[i].position]);
+		g_string_append_printf(output, "    scale: %.2f\n", options->weights[i].scale);
+		g_string_append(output, "    weights:\n");
 		bool isFirstAttribute = true;
 		for (uint64_t j = 0; j < vector_length(options->weights[i].weights); ++j) {
 			const float weight = options->weights[i].weights[j].weight;
 			const uint8_t attribute = options->weights[i].weights[j].attribute;
 			if (weight != 0) {
-				if (isFirstAttribute) {
-					fprintf(file, "      - %s: %.2f\n", attributes_getKey(attribute), weight);
-					isFirstAttribute = false;
-				} else {
-					fprintf(file, "        %s: %.2f\n", attributes_getKey(attribute), weight);
-				}
+				g_string_append_printf(
+					output,
+					isFirstAttribute ? "      - %s: %.2f\n" : "        %s: %.2f\n",
+					attributes_getKey(attribute),
+					weight
+				);
+				isFirstAttribute = false;
 			}
 		}
 	}
+}
 
-	fclose(file);
+// Writes the current in-memory defaults to a new options file so the user has one to edit.
+// The output is intentionally in the same form the parser reads back, so it round-trips.
+static void writeDefaultOptions(const char *path) {
+	GString *output = g_string_new("# Yet another Scouting Tool options\n");
+	g_string_append_printf(output, "dark-mode: %s\n", gameContext.options.darkMode ? "true" : "false");
+	appendFormationsBlock(output);
+	appendRatingsBlock(output);
 
-	LOG_INFO("Created default options file '%s'", path);
+	GError *error = NULL;
+	if (g_file_set_contents(path, output->str, (gssize)output->len, &error)) {
+		LOG_INFO("Created default options file '%s'", path);
+	} else {
+		LOG_WARN("Could not create default options file '%s'; continuing with in-memory defaults", path);
+		g_clear_error(&error);
+	}
+	g_string_free(output, TRUE);
 }
 
 void options_init(void) {
@@ -632,17 +648,15 @@ static void watchOptionsFile(void) {
 }
 
 /**
- * Rewrites only the top-level `columns:` line of the options file, appending one if there is none,
- * so comments and everything else in the file survive. The watcher then reloads the file as usual.
+ * Replaces one top-level key of the options file, along with the indented lines beneath it, with
+ * `block` (which must end in a newline), appending it when the file has no such key. Everything else
+ * in the file, comments included, is kept as it is. The file is then reloaded straight away rather
+ * than left to the watcher, so the change applies even where the file cannot be watched.
  */
-void options_saveColumns(void) {
+static void saveBlock(const char *key, const char *block) {
 	if (optionsPath[0] == '\0') {
+		LOG_WARN("No options file to save '%s' to", key);
 		return;
-	}
-
-	GString *columnsLine = g_string_new("columns:");
-	for (uint64_t i = 0; i < vector_length(gameContext.options.columns); ++i) {
-		g_string_append_printf(columnsLine, " %s", playerTable_columnKey(gameContext.options.columns[i]));
 	}
 
 	gchar *contents = NULL;
@@ -650,37 +664,82 @@ void options_saveColumns(void) {
 		contents = g_strdup("");
 	}
 
+	gchar *prefix = g_strdup_printf("%s:", key);
 	GString *output = g_string_new(NULL);
 	bool replaced = false;
+	bool inBlock = false;
 	gchar **lines = g_strsplit(contents, "\n", -1);
 	for (guint i = 0; lines[i] != NULL; ++i) {
+		const char *line = lines[i];
 		// g_strsplit leaves an empty final element after the file's trailing newline
-		if (lines[i + 1] == NULL && lines[i][0] == '\0') {
+		if (lines[i + 1] == NULL && line[0] == '\0') {
 			break;
 		}
 
-		if (!replaced && g_str_has_prefix(lines[i], "columns:")) {
-			g_string_append(output, columnsLine->str);
-			replaced = true;
-		} else {
-			g_string_append(output, lines[i]);
+		if (inBlock) {
+			// Indented and blank lines belong to the block being replaced; anything else ends it
+			if (line[0] == ' ' || line[0] == '\t' || line[0] == '\0' || line[0] == '\r') {
+				continue;
+			}
+			inBlock = false;
 		}
+
+		if (!replaced && g_str_has_prefix(line, prefix)) {
+			g_string_append(output, block);
+			replaced = true;
+			inBlock = true;
+			continue;
+		}
+
+		g_string_append(output, line);
 		g_string_append_c(output, '\n');
 	}
 	if (!replaced) {
-		g_string_append_printf(output, "%s\n", columnsLine->str);
+		g_string_append(output, block);
 	}
 
 	GError *error = NULL;
-	if (!g_file_set_contents(optionsPath, output->str, (gssize)output->len, &error)) {
-		LOG_WARN("Could not save columns to '%s': %s", optionsPath, error->message);
+	if (g_file_set_contents(optionsPath, output->str, (gssize)output->len, &error)) {
+		reloadOptions(NULL);
+	} else {
+		LOG_WARN("Could not save '%s' to '%s': %s", key, optionsPath, error->message);
 		g_clear_error(&error);
 	}
 
 	g_strfreev(lines);
+	g_free(prefix);
 	g_free(contents);
 	g_string_free(output, TRUE);
-	g_string_free(columnsLine, TRUE);
+}
+
+void options_saveColumns(void) {
+	GString *block = g_string_new("columns:");
+	for (uint64_t i = 0; i < vector_length(gameContext.options.columns); ++i) {
+		g_string_append_printf(block, " %s", playerTable_columnKey(gameContext.options.columns[i]));
+	}
+	g_string_append_c(block, '\n');
+	saveBlock("columns", block->str);
+	g_string_free(block, TRUE);
+}
+
+void options_saveFormations(void) {
+	GString *block = g_string_new(NULL);
+	appendFormationsBlock(block);
+	saveBlock("formations", block->str);
+	g_string_free(block, TRUE);
+}
+
+void options_saveRatings(void) {
+	GString *block = g_string_new(NULL);
+	appendRatingsBlock(block);
+	saveBlock("ratings", block->str);
+	g_string_free(block, TRUE);
+}
+
+void options_saveMyClub(void) {
+	gchar *block = g_strdup_printf("my-club: \"%s\"\n", gameContext.options.myClub);
+	saveBlock("my-club", block);
+	g_free(block);
 }
 
 void options_shutdown(void) {

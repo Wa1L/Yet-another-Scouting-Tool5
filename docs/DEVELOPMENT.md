@@ -340,3 +340,10 @@ download builds reputation. Code signing is the only real fix.
 - Confirm that the selected compiler supports C99 and that CMake is using the intended compiler/toolchain.
 - After changing compilers or package environments, configure a fresh build directory rather than reusing the previous
   cache.
+
+### Automated release builds
+
+The **Windows release** GitHub Actions workflow runs the same steps on a Windows runner. Publishing a GitHub release
+attaches the installer and zip to it automatically; running the workflow by hand from the Actions tab keeps them as a
+downloadable workflow artifact instead. The file names come from `PROJECT_VERSION` in `CMakeLists.txt`, not from the
+release tag, so bump the version there before tagging a release.

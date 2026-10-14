@@ -35,6 +35,7 @@ typedef struct {
 	GtkDropDown *transferStatus;
 	GtkDropDown *attribute[ATTRIBUTE_FILTER_COUNT];
 	GtkCheckButton *unattached;
+	GtkCheckButton *likelyToJoin;
 	GtkCheckButton *fastLearner;
 	GtkCheckButton *hotProspect;
 } FilterControls;

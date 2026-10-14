@@ -90,6 +90,26 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 							</object>
 						</child>
 						<child>
+							<object class="GtkButton">
+								<property name="label">My Squad</property>
+								<property name="tooltip-text">Squad depth and the squad planner for the club you manage (Ctrl+M)</property>
+								<signal name="clicked" handler="callbacks_onShowMySquad"/>
+								<style>
+									<class name="nav-tab"/>
+								</style>
+							</object>
+						</child>
+						<child>
+							<object class="GtkButton">
+								<property name="label">Settings</property>
+								<property name="tooltip-text">Your club, formations and rating weights (Ctrl+,)</property>
+								<signal name="clicked" handler="callbacks_onShowSettings"/>
+								<style>
+									<class name="nav-tab"/>
+								</style>
+							</object>
+						</child>
+						<child>
 							<object class="GtkBox">
 								<property name="hexpand">true</property>
 							</object>
@@ -606,6 +626,16 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 															<object class="GtkCheckButton" id="checkbox:unattached">
 																<property name="label">Unattached only</property>
 																<property name="tooltip-text">Players without a club</property>
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<style>
+																	<class name="sidebar-check"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:likely-to-join">
+																<property name="label">Likely to join my club</property>
+																<property name="tooltip-text">An estimate from reputation: neither the player nor their club is much more reputable than your club. Set your club in Settings.</property>
 																<signal name="toggled" handler="callbacks_onPositionToggled"/>
 																<style>
 																	<class name="sidebar-check"/>

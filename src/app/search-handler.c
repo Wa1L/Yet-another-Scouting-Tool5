@@ -146,6 +146,9 @@ static void cacheAdditionalFilters(FilterOptions *options) {
 	if (gtk_check_button_get_active(controls->unattached)) {
 		options->filterMask |= FILTER_HAS_UNATTACHED;
 	}
+	if (gtk_check_button_get_active(controls->likelyToJoin)) {
+		options->filterMask |= FILTER_HAS_LIKELY_TO_JOIN;
+	}
 	if (gtk_check_button_get_active(controls->fastLearner)) {
 		options->filterMask |= FILTER_HAS_FAST_LEARNER;
 	}
@@ -322,6 +325,7 @@ void searchHandler_clearFilters(void) {
 	gtk_drop_down_set_selected(controls->foot, FOOT_FILTER_ANY);
 	gtk_drop_down_set_selected(controls->transferStatus, TRANSFER_FILTER_ANY);
 	gtk_check_button_set_active(controls->unattached, FALSE);
+	gtk_check_button_set_active(controls->likelyToJoin, FALSE);
 	gtk_check_button_set_active(controls->fastLearner, FALSE);
 	gtk_check_button_set_active(controls->hotProspect, FALSE);
 

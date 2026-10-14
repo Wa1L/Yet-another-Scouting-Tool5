@@ -4,6 +4,7 @@
 #include "search.h"
 #include "app/maths.h"
 #include "app/mocks.h"
+#include "app/my-club.h"
 #include "app/player.h"
 #include "app/helpers/date.h"
 #include "app/helpers/text.h"
@@ -73,6 +74,10 @@ void search_findPlayers(void) {
 
 	uint32_t *playerIds = NULL;
 	const FilterOptions options = gameContext.filterOptions;
+#ifndef PLAYER_BY_ID
+	// Looked up once: it scans the club list. Unset, the "likely to join" filter is ignored.
+	const int64_t myClubIndex = options.filterMask & FILTER_HAS_LIKELY_TO_JOIN ? myClub_getIndex() : -1;
+#endif
 
 	for (uint32_t i = 0; i < gameContext.playerCount; ++i) {
 #ifndef PLAYER_BY_ID
@@ -177,6 +182,10 @@ void search_findPlayers(void) {
 		}
 
 		if (options.filterMask & FILTER_HAS_UNATTACHED && player->clubIndex != -1) {
+			continue;
+		}
+
+		if (myClubIndex >= 0 && !myClub_isLikelyToJoin(player, myClubIndex)) {
 			continue;
 		}
 
