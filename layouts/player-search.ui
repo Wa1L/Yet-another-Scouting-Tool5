@@ -52,6 +52,7 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 						<child>
 							<object class="GtkButton">
 								<property name="label">Current player</property>
+								<property name="tooltip-text">Open the player shown in-game (Ctrl+P)</property>
 								<signal name="clicked" handler="callbacks_onShowCurrentPlayer"/>
 								<style>
 									<class name="nav-tab"/>
@@ -61,6 +62,7 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 						<child>
 							<object class="GtkButton">
 								<property name="label">Best XI</property>
+								<property name="tooltip-text">Best XI from the search results (Ctrl+B)</property>
 								<signal name="clicked" handler="callbacks_onShowBestEleven"/>
 								<style>
 									<class name="nav-tab"/>
@@ -70,7 +72,18 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 						<child>
 							<object class="GtkButton">
 								<property name="label">Squad Depth</property>
+								<property name="tooltip-text">Squad depth from the search results (Ctrl+D)</property>
 								<signal name="clicked" handler="callbacks_onShowSquadDepth"/>
+								<style>
+									<class name="nav-tab"/>
+								</style>
+							</object>
+						</child>
+						<child>
+							<object class="GtkButton">
+								<property name="label">Shortlist</property>
+								<property name="tooltip-text">Your shortlisted players and how they have changed (Ctrl+L)</property>
+								<signal name="clicked" handler="callbacks_onShowShortlist"/>
 								<style>
 									<class name="nav-tab"/>
 								</style>
@@ -105,487 +118,1032 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 						<property name="vexpand">true</property>
 						<property name="css-classes">body</property>
 						<child>
-							<object class="GtkBox" id="box:sidebar">
-								<property name="orientation">vertical</property>
-								<property name="width-request">190</property>
-								<property name="spacing">6</property>
-								<property name="css-classes">sidebar</property>
+							<object class="GtkScrolledWindow">
+								<property name="hscrollbar-policy">never</property>
+								<property name="vscrollbar-policy">automatic</property>
+								<property name="width-request">240</property>
+								<!-- Set explicitly so the dropdowns' hexpand does not propagate and widen the sidebar -->
+								<property name="hexpand">false</property>
+								<property name="css-classes">sidebar-scroll</property>
 								<child>
-									<object class="GtkLabel">
-										<property name="label">FILTERS</property>
-										<property name="halign">start</property>
-										<property name="hexpand">false</property>
-										<style>
-											<class name="section-title"/>
-										</style>
-									</object>
-								</child>
+									<object class="GtkBox" id="box:sidebar">
+										<property name="orientation">vertical</property>
+										<property name="width-request">190</property>
+										<property name="spacing">6</property>
+										<property name="css-classes">sidebar</property>
+										<child>
+											<object class="GtkLabel">
+												<property name="label">FILTERS</property>
+												<property name="halign">start</property>
+												<property name="hexpand">false</property>
+												<style>
+													<class name="section-title"/>
+												</style>
+											</object>
+										</child>
 
-								<child>
-									<object class="GtkSearchEntry" id="entry:club">
-										<property name="placeholder-text">Filter by club</property>
-										<property name="css-classes">sidebar-search</property>
-									</object>
-								</child>
-								<child>
-									<object class="GtkSearchEntry" id="entry:nationality">
-										<property name="placeholder-text">Filter by nation</property>
-										<property name="css-classes">sidebar-search</property>
-									</object>
-								</child>
-								<child>
-									<object class="GtkBox">
-										<property name="orientation">vertical</property>
-										<property name="spacing">6</property>
-										<property name="css-classes">quality-body</property>
 										<child>
-											<object class="GtkBox">
-												<property name="spacing">4</property>
-												<style>
-													<class name="quality-row"/>
-												</style>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">Age</property>
-														<property name="halign">start</property>
-														<style>
-															<class name="quality-label"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:age:min">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">-</property>
-														<style>
-															<class name="quality-dash"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:age:max">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
+											<object class="GtkSearchEntry" id="entry:name">
+												<property name="placeholder-text">Search by name (Ctrl+F)</property>
+												<property name="css-classes">sidebar-search</property>
+												<signal name="search-changed" handler="callbacks_onNameSearchChanged"/>
+											</object>
+										</child>
+										<child>
+											<object class="GtkSearchEntry" id="entry:club">
+												<property name="placeholder-text">Filter by club</property>
+												<property name="css-classes">sidebar-search</property>
+											</object>
+										</child>
+										<child>
+											<object class="GtkSearchEntry" id="entry:nationality">
+												<property name="placeholder-text">Filter by nation</property>
+												<property name="css-classes">sidebar-search</property>
 											</object>
 										</child>
 										<child>
 											<object class="GtkBox">
-												<property name="spacing">4</property>
+												<property name="orientation">vertical</property>
+												<property name="spacing">6</property>
+												<property name="css-classes">quality-body</property>
+												<child>
+													<object class="GtkBox">
+														<property name="spacing">4</property>
+														<style>
+															<class name="quality-row"/>
+														</style>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">Age</property>
+																<property name="halign">start</property>
+																<style>
+																	<class name="quality-label"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:age:min">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">-</property>
+																<style>
+																	<class name="quality-dash"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:age:max">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+													</object>
+												</child>
+												<child>
+													<object class="GtkBox">
+														<property name="spacing">4</property>
+														<style>
+															<class name="quality-row"/>
+														</style>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">CA</property>
+																<property name="halign">start</property>
+																<style>
+																	<class name="quality-label"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:ca:min">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">-</property>
+																<style>
+																	<class name="quality-dash"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:ca:max">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+													</object>
+												</child>
+												<child>
+													<object class="GtkBox">
+														<property name="spacing">4</property>
+														<style>
+															<class name="quality-row"/>
+														</style>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">PA</property>
+																<property name="halign">start</property>
+																<style>
+																	<class name="quality-label"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:pa:min">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">-</property>
+																<style>
+																	<class name="quality-dash"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:pa:max">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+													</object>
+												</child>
+												<child>
+													<object class="GtkBox">
+														<property name="spacing">4</property>
+														<style>
+															<class name="quality-row"/>
+														</style>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">Rating</property>
+																<property name="halign">start</property>
+																<style>
+																	<class name="quality-label"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:rating:min">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">-</property>
+																<style>
+																	<class name="quality-dash"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:rating:max">
+																<property name="max-width-chars">3</property>
+																<property name="width-chars">3</property>
+																<property name="css-classes">quality-entry</property>
+															</object>
+														</child>
+													</object>
+												</child>
+												<child>
+													<object class="GtkBox">
+														<property name="spacing">4</property>
+														<style>
+															<class name="quality-row"/>
+														</style>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">Value</property>
+																<property name="halign">start</property>
+																<style>
+																	<class name="quality-label"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:value:min">
+																<property name="max-width-chars">5</property>
+																<property name="width-chars">5</property>
+																<property name="css-classes">quality-entry</property>
+																<property name="tooltip-text">Accepts shorthand such as 750k or 2.5m</property>
+															</object>
+														</child>
+														<child>
+															<object class="GtkLabel">
+																<property name="label">-</property>
+																<style>
+																	<class name="quality-dash"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkEntry" id="entry:value:max">
+																<property name="max-width-chars">5</property>
+																<property name="width-chars">5</property>
+																<property name="css-classes">quality-entry</property>
+																<property name="tooltip-text">Accepts shorthand such as 750k or 2.5m</property>
+															</object>
+														</child>
+													</object>
+												</child>
+											</object>
+										</child>
+										<child>
+											<object class="GtkExpander">
+												<property name="css-classes">filter-section</property>
+												<property name="label-widget">
+													<object class="GtkLabel">
+														<property name="label">REPUTATION</property>
+														<style>
+															<class name="section-title"/>
+														</style>
+													</object>
+												</property>
+												<property name="child">
+													<object class="GtkBox">
+														<property name="orientation">vertical</property>
+														<property name="spacing">6</property>
+														<property name="css-classes">quality-body</property>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">Home</property>
+																		<property name="halign">start</property>
+																		<style>
+																			<class name="quality-label"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:reputation:home:min">
+																		<property name="max-width-chars">5</property>
+																		<property name="width-chars">5</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">0 to 10,000</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">-</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:reputation:home:max">
+																		<property name="max-width-chars">5</property>
+																		<property name="width-chars">5</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">0 to 10,000</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">Current</property>
+																		<property name="halign">start</property>
+																		<style>
+																			<class name="quality-label"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:reputation:current:min">
+																		<property name="max-width-chars">5</property>
+																		<property name="width-chars">5</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">0 to 10,000</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">-</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:reputation:current:max">
+																		<property name="max-width-chars">5</property>
+																		<property name="width-chars">5</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">0 to 10,000</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">World</property>
+																		<property name="halign">start</property>
+																		<style>
+																			<class name="quality-label"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:reputation:world:min">
+																		<property name="max-width-chars">5</property>
+																		<property name="width-chars">5</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">0 to 10,000</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">-</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:reputation:world:max">
+																		<property name="max-width-chars">5</property>
+																		<property name="width-chars">5</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">0 to 10,000</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+													</object>
+												</property>
+											</object>
+										</child>
+										<child>
+											<object class="GtkExpander">
+												<property name="css-classes">filter-section</property>
+												<property name="label-widget">
+													<object class="GtkLabel">
+														<property name="label">CONTRACT</property>
+														<style>
+															<class name="section-title"/>
+														</style>
+													</object>
+												</property>
+												<property name="child">
+													<object class="GtkBox">
+														<property name="orientation">vertical</property>
+														<property name="spacing">6</property>
+														<property name="css-classes">quality-body</property>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">Max wage</property>
+																		<property name="halign">start</property>
+																		<style>
+																			<class name="quality-label-wide"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:wage:max">
+																		<property name="max-width-chars">6</property>
+																		<property name="width-chars">6</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Per week. Accepts shorthand such as 750k or 2.5m</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">Expires in ≤</property>
+																		<property name="halign">start</property>
+																		<style>
+																			<class name="quality-label-wide"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:contract:months">
+																		<property name="max-width-chars">3</property>
+																		<property name="width-chars">3</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Contracts ending within this many months</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">months</property>
+																		<property name="halign">start</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+															</object>
+														</child>
+														<child>
+															<object class="GtkDropDown" id="dropdown:transfer-status">
+																<property name="hexpand">true</property>
+																<property name="model">
+																	<object class="GtkStringList">
+																		<items>
+																			<item>Any transfer status</item>
+																			<item>Transfer listed</item>
+																			<item>Loan listed</item>
+																			<item>Transfer or loan listed</item>
+																		</items>
+																	</object>
+																</property>
+																<signal name="notify::selected" handler="callbacks_onFilterDropDownChanged"/>
+																<style>
+																	<class name="sidebar-dropdown"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:unattached">
+																<property name="label">Unattached only</property>
+																<property name="tooltip-text">Players without a club</property>
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<style>
+																	<class name="sidebar-check"/>
+																</style>
+															</object>
+														</child>
+													</object>
+												</property>
+											</object>
+										</child>
+										<child>
+											<object class="GtkExpander">
+												<property name="css-classes">filter-section</property>
+												<property name="label-widget">
+													<object class="GtkLabel">
+														<property name="label">PLAYER</property>
+														<style>
+															<class name="section-title"/>
+														</style>
+													</object>
+												</property>
+												<property name="child">
+													<object class="GtkBox">
+														<property name="orientation">vertical</property>
+														<property name="spacing">6</property>
+														<property name="css-classes">quality-body</property>
+														<child>
+															<object class="GtkDropDown" id="dropdown:foot">
+																<property name="hexpand">true</property>
+																<property name="tooltip-text">Two footed means both feet are 15 or more</property>
+																<property name="model">
+																	<object class="GtkStringList">
+																		<items>
+																			<item>Any foot</item>
+																			<item>Left footed</item>
+																			<item>Right footed</item>
+																			<item>Two footed</item>
+																		</items>
+																	</object>
+																</property>
+																<signal name="notify::selected" handler="callbacks_onFilterDropDownChanged"/>
+																<style>
+																	<class name="sidebar-dropdown"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:fast-learner">
+																<property name="label">🧠 Fast learner only</property>
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<style>
+																	<class name="sidebar-check"/>
+																</style>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:hot-prospect">
+																<property name="label">🔥 Hot prospect only</property>
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<style>
+																	<class name="sidebar-check"/>
+																</style>
+															</object>
+														</child>
+													</object>
+												</property>
+											</object>
+										</child>
+										<child>
+											<object class="GtkExpander">
+												<property name="css-classes">filter-section</property>
+												<property name="label-widget">
+													<object class="GtkLabel">
+														<property name="label">ATTRIBUTES</property>
+														<style>
+															<class name="section-title"/>
+														</style>
+													</object>
+												</property>
+												<property name="child">
+													<object class="GtkBox">
+														<property name="orientation">vertical</property>
+														<property name="spacing">6</property>
+														<property name="css-classes">quality-body</property>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkDropDown" id="dropdown:attribute:0">
+																		<property name="hexpand">true</property>
+																		<property name="enable-search">true</property>
+																		<property name="expression">
+																			<lookup type="GtkStringObject" name="string"/>
+																		</property>
+																		<property name="model">
+																			<object class="GtkStringList" id="string-list:attribute:0"/>
+																		</property>
+																		<signal name="notify::selected" handler="callbacks_onFilterDropDownChanged"/>
+																		<style>
+																			<class name="sidebar-dropdown"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:attribute:0:min">
+																		<property name="max-width-chars">2</property>
+																		<property name="width-chars">2</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Minimum, 1-20</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">-</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:attribute:0:max">
+																		<property name="max-width-chars">2</property>
+																		<property name="width-chars">2</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Maximum, 1-20</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkDropDown" id="dropdown:attribute:1">
+																		<property name="hexpand">true</property>
+																		<property name="enable-search">true</property>
+																		<property name="expression">
+																			<lookup type="GtkStringObject" name="string"/>
+																		</property>
+																		<property name="model">
+																			<object class="GtkStringList" id="string-list:attribute:1"/>
+																		</property>
+																		<signal name="notify::selected" handler="callbacks_onFilterDropDownChanged"/>
+																		<style>
+																			<class name="sidebar-dropdown"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:attribute:1:min">
+																		<property name="max-width-chars">2</property>
+																		<property name="width-chars">2</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Minimum, 1-20</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">-</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:attribute:1:max">
+																		<property name="max-width-chars">2</property>
+																		<property name="width-chars">2</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Maximum, 1-20</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+														<child>
+															<object class="GtkBox">
+																<property name="spacing">4</property>
+																<style>
+																	<class name="quality-row"/>
+																</style>
+																<child>
+																	<object class="GtkDropDown" id="dropdown:attribute:2">
+																		<property name="hexpand">true</property>
+																		<property name="enable-search">true</property>
+																		<property name="expression">
+																			<lookup type="GtkStringObject" name="string"/>
+																		</property>
+																		<property name="model">
+																			<object class="GtkStringList" id="string-list:attribute:2"/>
+																		</property>
+																		<signal name="notify::selected" handler="callbacks_onFilterDropDownChanged"/>
+																		<style>
+																			<class name="sidebar-dropdown"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:attribute:2:min">
+																		<property name="max-width-chars">2</property>
+																		<property name="width-chars">2</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Minimum, 1-20</property>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkLabel">
+																		<property name="label">-</property>
+																		<style>
+																			<class name="quality-dash"/>
+																		</style>
+																	</object>
+																</child>
+																<child>
+																	<object class="GtkEntry" id="entry:attribute:2:max">
+																		<property name="max-width-chars">2</property>
+																		<property name="width-chars">2</property>
+																		<property name="css-classes">quality-entry</property>
+																		<property name="tooltip-text">Maximum, 1-20</property>
+																	</object>
+																</child>
+															</object>
+														</child>
+													</object>
+												</property>
+											</object>
+										</child>
+										<child>
+											<object class="GtkLabel">
+												<property name="label">POSITIONS</property>
+												<property name="halign">start</property>
+												<property name="hexpand">false</property>
 												<style>
-													<class name="quality-row"/>
+													<class name="section-title"/>
 												</style>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">CA</property>
-														<property name="halign">start</property>
-														<style>
-															<class name="quality-label"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:ca:min">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">-</property>
-														<style>
-															<class name="quality-dash"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:ca:max">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
 											</object>
 										</child>
 										<child>
 											<object class="GtkBox">
-												<property name="spacing">4</property>
-												<style>
-													<class name="quality-row"/>
-												</style>
+												<property name="orientation">vertical</property>
+												<property name="spacing">6</property>
+												<property name="css-classes">quality-body</property>
 												<child>
-													<object class="GtkLabel">
-														<property name="label">PA</property>
-														<property name="halign">start</property>
+													<object class="GtkGrid">
+														<property name="halign">center</property>
+														<property name="column-homogeneous">true</property>
+														<property name="row-homogeneous">true</property>
+														<property name="column-spacing">4</property>
+														<property name="row-spacing">4</property>
 														<style>
-															<class name="quality-label"/>
+															<class name="position-pitch"/>
 														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:pa:min">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">-</property>
-														<style>
-															<class name="quality-dash"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:pa:max">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:st">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="margin-top">8</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">ST</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">1</property>
+																	<property name="row">0</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:aml">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">AML</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">0</property>
+																	<property name="row">1</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:amc">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">AMC</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">1</property>
+																	<property name="row">1</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:amr">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">AMR</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">2</property>
+																	<property name="row">1</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:ml">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">ML</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">0</property>
+																	<property name="row">2</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:mc">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">MC</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">1</property>
+																	<property name="row">2</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:mr">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">MR</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">2</property>
+																	<property name="row">2</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:wbl">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">WBL</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">0</property>
+																	<property name="row">3</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:dm">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">DM</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">1</property>
+																	<property name="row">3</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:wbr">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">WBR</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">2</property>
+																	<property name="row">3</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:dl">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">DL</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">0</property>
+																	<property name="row">4</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:dc">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">DC</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">1</property>
+																	<property name="row">4</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:dr">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">DR</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">2</property>
+																	<property name="row">4</property>
+																</layout>
+															</object>
+														</child>
+														<child>
+															<object class="GtkCheckButton" id="checkbox:position:gk">
+																<signal name="toggled" handler="callbacks_onPositionToggled"/>
+																<property name="valign">center</property>
+																<property name="margin-bottom">8</property>
+																<property name="child">
+																	<object class="GtkLabel">
+																		<property name="label">GK</property>
+																		<property name="hexpand">true</property>
+																	</object>
+																</property>
+																<style>
+																	<class name="position-toggle"/>
+																</style>
+																<layout>
+																	<property name="column">1</property>
+																	<property name="row">5</property>
+																</layout>
+															</object>
+														</child>
 													</object>
 												</child>
 											</object>
 										</child>
 										<child>
-											<object class="GtkBox">
-												<property name="spacing">4</property>
+											<object class="GtkButton" id="button:clear-filters">
+												<property name="label">Clear filters</property>
+												<signal name="clicked" handler="callbacks_onFiltersClear"/>
 												<style>
-													<class name="quality-row"/>
+													<class name="btn-secondary"/>
 												</style>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">Rating</property>
-														<property name="halign">start</property>
-														<style>
-															<class name="quality-label"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:rating:min">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
-												<child>
-													<object class="GtkLabel">
-														<property name="label">-</property>
-														<style>
-															<class name="quality-dash"/>
-														</style>
-													</object>
-												</child>
-												<child>
-													<object class="GtkEntry" id="entry:rating:max">
-														<property name="max-width-chars">3</property>
-														<property name="width-chars">3</property>
-														<property name="css-classes">quality-entry</property>
-													</object>
-												</child>
 											</object>
 										</child>
-									</object>
-								</child>
-								<child>
-									<object class="GtkLabel">
-										<property name="label">POSITIONS</property>
-										<property name="halign">start</property>
-										<property name="hexpand">false</property>
-										<style>
-											<class name="section-title"/>
-										</style>
-									</object>
-								</child>
-								<child>
-									<object class="GtkBox">
-										<property name="orientation">vertical</property>
-										<property name="spacing">6</property>
-										<property name="css-classes">quality-body</property>
-										<child>
-											<object class="GtkGrid">
-												<property name="halign">center</property>
-												<property name="column-homogeneous">true</property>
-												<property name="row-homogeneous">true</property>
-												<property name="column-spacing">4</property>
-												<property name="row-spacing">4</property>
-												<style>
-													<class name="position-pitch"/>
-												</style>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:st">
-														<property name="valign">center</property>
-														<property name="margin-top">8</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">ST</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">1</property>
-															<property name="row">0</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:aml">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">AML</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">0</property>
-															<property name="row">1</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:amc">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">AMC</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">1</property>
-															<property name="row">1</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:amr">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">AMR</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">2</property>
-															<property name="row">1</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:ml">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">ML</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">0</property>
-															<property name="row">2</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:mc">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">MC</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">1</property>
-															<property name="row">2</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:mr">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">MR</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">2</property>
-															<property name="row">2</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:wbl">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">WBL</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">0</property>
-															<property name="row">3</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:dm">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">DM</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">1</property>
-															<property name="row">3</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:wbr">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">WBR</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">2</property>
-															<property name="row">3</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:dl">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">DL</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">0</property>
-															<property name="row">4</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:dc">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">DC</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">1</property>
-															<property name="row">4</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:dr">
-														<property name="valign">center</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">DR</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">2</property>
-															<property name="row">4</property>
-														</layout>
-													</object>
-												</child>
-												<child>
-													<object class="GtkCheckButton" id="checkbox:position:gk">
-														<property name="valign">center</property>
-														<property name="margin-bottom">8</property>
-														<property name="child">
-															<object class="GtkLabel">
-																<property name="label">GK</property>
-																<property name="hexpand">true</property>
-															</object>
-														</property>
-														<style>
-															<class name="position-toggle"/>
-														</style>
-														<layout>
-															<property name="column">1</property>
-															<property name="row">5</property>
-														</layout>
-													</object>
-												</child>
-											</object>
-										</child>
-									</object>
-								</child>
-								<child>
-									<object class="GtkButton" id="button:clear-filters">
-										<property name="label">Clear filters</property>
-										<signal name="clicked" handler="callbacks_onFiltersClear"/>
-										<style>
-											<class name="btn-secondary"/>
-										</style>
 									</object>
 								</child>
 							</object>
@@ -613,6 +1171,20 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 												<signal name="clicked" handler="callbacks_onFiltersClear"/>
 												<style>
 													<class name="link-btn"/>
+												</style>
+											</object>
+										</child>
+										<child>
+											<object class="GtkBox">
+												<property name="hexpand">true</property>
+											</object>
+										</child>
+										<child>
+											<object class="GtkMenuButton" id="menubutton:columns">
+												<property name="label">Columns</property>
+												<property name="tooltip-text">Choose which columns the results show</property>
+												<style>
+													<class name="columns-button"/>
 												</style>
 											</object>
 										</child>

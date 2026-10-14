@@ -4,7 +4,11 @@
 #include "player-table.h"
 #include "app/entities.h"
 #include "app/injury-names.h"
+#include "app/options.h"
+#include "app/player.h"
 #include "app/ui.h"
+#include "app/helpers/attributes.h"
+#include "app/helpers/date.h"
 #include "app/helpers/formatter.h"
 #include "app/helpers/vector-shared-pointer.h"
 #include "app/helpers/vector.h"
@@ -17,9 +21,66 @@
 #include "maths.h"
 
 
+typedef enum {
+	COLUMN_NATIONALITIES,
+	COLUMN_NAME,
+	COLUMN_AGE,
+	COLUMN_POSITIONS,
+	COLUMN_FOOT,
+	COLUMN_CA,
+	COLUMN_PA,
+	COLUMN_CA_PA_DELTA,
+	COLUMN_STATUS,
+	COLUMN_RATING,
+	COLUMN_VALUE,
+	COLUMN_VALUE_FOR_MONEY,
+	COLUMN_WAGE,
+	COLUMN_CONTRACT_END,
+	COLUMN_CLUB,
+	COLUMN_REPUTATION_HOME,
+	COLUMN_REPUTATION_CURRENT,
+	COLUMN_REPUTATION_WORLD,
+	COLUMN_BUILTIN_COUNT,
+	// One column per attribute follows, at COLUMN_ATTRIBUTE_FIRST + ATTR_*
+	COLUMN_ATTRIBUTE_FIRST = COLUMN_BUILTIN_COUNT,
+	COLUMN_COUNT = COLUMN_ATTRIBUTE_FIRST + ATTRIBUTE_COUNT,
+} Columns;
+
+typedef struct {
+	const char *key; // As written in options.yaml
+	const char *title;
+} ColumnDefinition;
+
+// Indexed by Columns; attribute columns take their key and title from the attribute itself
+static const ColumnDefinition builtinColumns[COLUMN_BUILTIN_COUNT] = {
+	[COLUMN_NATIONALITIES] = {"nationality", ""},
+	[COLUMN_NAME] = {"name", "Name"},
+	[COLUMN_AGE] = {"age", "Age"},
+	[COLUMN_POSITIONS] = {"positions", "Positions"},
+	[COLUMN_FOOT] = {"foot", "Foot"},
+	[COLUMN_CA] = {"ca", "CA"},
+	[COLUMN_PA] = {"pa", "PA"},
+	[COLUMN_CA_PA_DELTA] = {"diff", "Diff"},
+	[COLUMN_STATUS] = {"status", "Status"},
+	[COLUMN_RATING] = {"rating", "Rating"},
+	[COLUMN_VALUE] = {"value", "Value"},
+	[COLUMN_VALUE_FOR_MONEY] = {"value-for-money", "Rtg/£M"},
+	[COLUMN_WAGE] = {"wage", "Wage p/w"},
+	[COLUMN_CONTRACT_END] = {"contract", "Contract ends"},
+	[COLUMN_CLUB] = {"club", "Club"},
+	[COLUMN_REPUTATION_HOME] = {"home-rep", "Home rep"},
+	[COLUMN_REPUTATION_CURRENT] = {"current-rep", "Current rep"},
+	[COLUMN_REPUTATION_WORLD] = {"world-rep", "World rep"},
+};
+
+// Contracts ending within this many months are highlighted
+#define CONTRACT_EXPIRING_MONTHS 6
+
 typedef struct {
 	GtkColumnView *table;
 	GtkSingleSelection *selection;
+	GtkColumnViewColumn *columns[COLUMN_COUNT];
+	GtkCheckButton *columnToggles[COLUMN_COUNT];
 	double savedScrollValue;
 	gulong scrollGuardId;
 } PlayerTableContext;
@@ -43,22 +104,6 @@ enum {
 	N_PROPS
 };
 
-typedef enum {
-	COLUMN_NATIONALITIES,
-	COLUMN_NAME,
-	COLUMN_AGE,
-	COLUMN_POSITIONS,
-	COLUMN_CA,
-	COLUMN_PA,
-	COLUMN_CA_PA_DELTA,
-	COLUMN_STATUS,
-	COLUMN_RATING,
-	COLUMN_VALUE,
-	COLUMN_CLUB,
-	COLUMN_REPUTATION_HOME,
-	COLUMN_REPUTATION_CURRENT,
-	COLUMN_REPUTATION_WORLD,
-} Columns;
 
 static GParamSpec *properties[N_PROPS];
 
@@ -419,7 +464,13 @@ static GString *formatPlayerPositions(const uint8_t *positions) {
 	return str;
 }
 
-static void bindCellValue(const GtkSignalListItemFactory *factory, GtkListItem *item, const uint8_t columnId) {
+/** Rating points per £1M of guide value. Values under £100K are floored so they do not dominate. */
+static float getValueForMoney(const Player *player) {
+	const float value = player->guideValue > 100000 ? (float)player->guideValue : 100000.f;
+	return player->ratings[0].value / value * 1e6f;
+}
+
+static void bindCellValue(const GtkSignalListItemFactory *factory, GtkListItem *item, const uint16_t columnId) {
 	(void)factory;
 
 	GtkWidget *label = gtk_list_item_get_child(GTK_LIST_ITEM(item));
@@ -431,16 +482,23 @@ static void bindCellValue(const GtkSignalListItemFactory *factory, GtkListItem *
 	}
 
 	const Player *player = row->player;
+	gtk_widget_remove_css_class(label, "contract-expiring");
+
+	if (columnId >= COLUMN_ATTRIBUTE_FIRST) {
+		printNumeric(label, convertTo20Scale(player->attributes[columnId - COLUMN_ATTRIBUTE_FIRST]));
+		return;
+	}
 
 	switch (columnId) {
-		case COLUMN_NAME:
-			if (player->commonName[0] == '\0') {
-				char buffer[PERSON_FORENAME_LENGTH + PERSON_SURNAME_LENGTH + 2];
-				snprintf(buffer, sizeof(buffer), "%s %s", player->forename, player->surname);
-				gtk_label_set_text(GTK_LABEL(label), buffer);
-			} else {
-				gtk_label_set_text(GTK_LABEL(label), player->commonName);
-			}
+		case COLUMN_NAME: {
+			char buffer[PLAYER_DISPLAY_NAME_LENGTH];
+			player_getDisplayName(player, buffer, sizeof(buffer));
+			gtk_label_set_text(GTK_LABEL(label), buffer);
+			gtk_label_set_xalign(GTK_LABEL(label), 0);
+			break;
+		}
+		case COLUMN_FOOT:
+			gtk_label_set_text(GTK_LABEL(label), player_getFootName(player_getFoot(player)));
 			gtk_label_set_xalign(GTK_LABEL(label), 0);
 			break;
 		case COLUMN_AGE:
@@ -467,6 +525,32 @@ static void bindCellValue(const GtkSignalListItemFactory *factory, GtkListItem *
 			break;
 		case COLUMN_VALUE:
 			printCurrency(label, player->guideValue);
+			break;
+		case COLUMN_VALUE_FOR_MONEY: {
+			char buffer[16];
+			snprintf(buffer, sizeof(buffer), "%.1f", getValueForMoney(player));
+			gtk_label_set_text(GTK_LABEL(label), buffer);
+			break;
+		}
+		case COLUMN_WAGE:
+			if (player->clubIndex == -1) {
+				gtk_label_set_text(GTK_LABEL(label), "");
+			} else {
+				printCurrency(label, player->weeklyWage);
+			}
+			break;
+		case COLUMN_CONTRACT_END:
+			if (player->clubIndex == -1 || player->contractEnd.year == 0) {
+				gtk_label_set_text(GTK_LABEL(label), "");
+			} else {
+				char buffer[DATE_FORMAT_SIZE];
+				date_format(player->contractEnd, buffer, sizeof(buffer));
+				gtk_label_set_text(GTK_LABEL(label), buffer);
+				if (date_monthsUntil(player->contractEnd) <= CONTRACT_EXPIRING_MONTHS) {
+					gtk_widget_add_css_class(label, "contract-expiring");
+				}
+			}
+			gtk_label_set_xalign(GTK_LABEL(label), 0);
 			break;
 		case COLUMN_CLUB: {
 			const Club *club = entities_getClub(player->clubIndex);
@@ -615,7 +699,7 @@ static void onSorterChanged(GtkSorter *sorter, const GtkSorterChange change, gpo
 	}
 }
 
-static GtkColumnViewColumn *createColumn(const char *title, const uint8_t columnType, GtkSorter *sorter) {
+static GtkColumnViewColumn *createColumn(const char *title, const uint16_t columnType, GtkSorter *sorter) {
 	GtkListItemFactory *factory = gtk_signal_list_item_factory_new();
 	if (columnType == COLUMN_NATIONALITIES) {
 		g_signal_connect(factory, "setup", G_CALLBACK(setupBox), NULL);
@@ -630,7 +714,7 @@ static GtkColumnViewColumn *createColumn(const char *title, const uint8_t column
 			G_CALLBACK(columnType == COLUMN_RATING ? setupRatingLabel : setupTextLabel),
 			NULL
 		);
-		g_signal_connect(factory, "bind", G_CALLBACK(bindCellValue), (void *)(uint64_t)columnType);
+		g_signal_connect(factory, "bind", G_CALLBACK(bindCellValue), GUINT_TO_POINTER(columnType));
 	}
 
 	GtkColumnViewColumn *column = gtk_column_view_column_new(title, factory);
@@ -641,6 +725,231 @@ static GtkColumnViewColumn *createColumn(const char *title, const uint8_t column
 	}
 
 	return column;
+}
+
+static double getSortValue(const Player *player, const uint16_t columnId) {
+	if (columnId >= COLUMN_ATTRIBUTE_FIRST) {
+		return player->attributes[columnId - COLUMN_ATTRIBUTE_FIRST];
+	}
+
+	switch (columnId) {
+		case COLUMN_FOOT: return player_getFoot(player);
+		case COLUMN_VALUE: return player->guideValue;
+		case COLUMN_VALUE_FOR_MONEY: return getValueForMoney(player);
+		case COLUMN_WAGE: return player->clubIndex == -1 ? 0 : player->weeklyWage;
+		// No contract sorts after every real date
+		case COLUMN_CONTRACT_END:
+			return player->clubIndex == -1 || player->contractEnd.year == 0
+				? INT32_MAX
+				: date_daysUntil(player->contractEnd);
+		case COLUMN_REPUTATION_HOME: return player->homeReputation;
+		case COLUMN_REPUTATION_CURRENT: return player->currentReputation;
+		case COLUMN_REPUTATION_WORLD: return player->worldReputation;
+		default: return 0;
+	}
+}
+
+static int compareRows(gconstpointer a, gconstpointer b, gpointer data) {
+	const Player *playerA = ((const SearchPlayerRow*)a)->player;
+	const Player *playerB = ((const SearchPlayerRow*)b)->player;
+	const uint16_t columnId = (uint16_t)GPOINTER_TO_UINT(data);
+
+	if (columnId == COLUMN_CLUB) {
+		const Club *clubA = entities_getClub(playerA->clubIndex);
+		const Club *clubB = entities_getClub(playerB->clubIndex);
+		const int order = g_utf8_collate(clubA != NULL ? clubA->shortName : "", clubB != NULL ? clubB->shortName : "");
+		return order < 0 ? GTK_ORDERING_SMALLER : order > 0 ? GTK_ORDERING_LARGER : GTK_ORDERING_EQUAL;
+	}
+
+	const double valueA = getSortValue(playerA, columnId);
+	const double valueB = getSortValue(playerB, columnId);
+	return valueA < valueB ? GTK_ORDERING_SMALLER : valueA > valueB ? GTK_ORDERING_LARGER : GTK_ORDERING_EQUAL;
+}
+
+static GtkSorter *createCustomSorter(const uint16_t columnId) {
+	return GTK_SORTER(gtk_custom_sorter_new(compareRows, GUINT_TO_POINTER(columnId), NULL));
+}
+
+static const char *getColumnTitle(const uint16_t columnId) {
+	return columnId < COLUMN_BUILTIN_COUNT
+		? builtinColumns[columnId].title
+		: attributes_getName((uint8_t)(columnId - COLUMN_ATTRIBUTE_FIRST));
+}
+
+const char *playerTable_columnKey(const uint16_t columnId) {
+	if (columnId < COLUMN_BUILTIN_COUNT) {
+		return builtinColumns[columnId].key;
+	}
+
+	return columnId < COLUMN_COUNT ? attributes_getKey((uint8_t)(columnId - COLUMN_ATTRIBUTE_FIRST)) : "";
+}
+
+// Built-in columns are matched exactly, attributes by their options.yaml name (e.g. "Pace")
+bool playerTable_columnFromKey(const char *key, uint16_t *outColumnId) {
+	for (uint16_t i = 0; i < COLUMN_BUILTIN_COUNT; ++i) {
+		if (!strcmp(key, builtinColumns[i].key)) {
+			*outColumnId = i;
+			return true;
+		}
+	}
+
+	uint8_t attribute;
+	if (attributes_fromKey(key, &attribute)) {
+		*outColumnId = (uint16_t)(COLUMN_ATTRIBUTE_FIRST + attribute);
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Orders and shows the columns options.yaml lists, hiding the rest. Without a `columns` key every
+ * built-in column shows in its default order and the attribute columns stay hidden.
+ */
+void playerTable_applyColumns(void) {
+	if (context.table == NULL) {
+		return;
+	}
+
+	const Options *options = &gameContext.options;
+	bool isVisible[COLUMN_COUNT] = {0};
+	bool isPlaced[COLUMN_COUNT] = {0};
+	guint position = 0;
+
+	if (options->columnsSet) {
+		for (uint64_t i = 0; i < vector_length(options->columns); ++i) {
+			const uint16_t columnId = options->columns[i];
+			if (columnId < COLUMN_COUNT && !isPlaced[columnId]) {
+				gtk_column_view_insert_column(context.table, position++, context.columns[columnId]);
+				isVisible[columnId] = true;
+				isPlaced[columnId] = true;
+			}
+		}
+	} else {
+		for (uint16_t i = 0; i < COLUMN_BUILTIN_COUNT; ++i) {
+			isVisible[i] = true;
+		}
+	}
+
+	for (uint16_t i = 0; i < COLUMN_COUNT; ++i) {
+		if (!isPlaced[i]) {
+			gtk_column_view_insert_column(context.table, position++, context.columns[i]);
+		}
+		gtk_column_view_column_set_visible(context.columns[i], isVisible[i]);
+
+		// Kept in step without re-entering onColumnToggled, which would write the options file again
+		GtkCheckButton *toggle = context.columnToggles[i];
+		if (toggle != NULL && gtk_check_button_get_active(toggle) != isVisible[i]) {
+			g_object_set_data(G_OBJECT(toggle), "syncing", GINT_TO_POINTER(1));
+			gtk_check_button_set_active(toggle, isVisible[i]);
+			g_object_set_data(G_OBJECT(toggle), "syncing", NULL);
+		}
+	}
+}
+
+/**
+ * Showing a column appends it to the end; hiding one removes it. Either way the visible columns, in
+ * their current order, become the `columns` option and are written back to options.yaml.
+ */
+static void onColumnToggled(GtkCheckButton *button, gpointer data) {
+	if (g_object_get_data(G_OBJECT(button), "syncing") != NULL) {
+		return;
+	}
+
+	const uint16_t toggledId = (uint16_t)GPOINTER_TO_UINT(data);
+	const bool isActive = gtk_check_button_get_active(button);
+
+	uint16_t *columns = NULL;
+	GListModel *viewColumns = gtk_column_view_get_columns(context.table);
+	const guint count = g_list_model_get_n_items(viewColumns);
+	for (guint i = 0; i < count; ++i) {
+		GtkColumnViewColumn *column = g_list_model_get_item(viewColumns, i);
+		const uint16_t columnId = (uint16_t)GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(column), "column-id"));
+		if (gtk_column_view_column_get_visible(column) && columnId != toggledId) {
+			vector_push(columns, columnId);
+		}
+		g_object_unref(column);
+	}
+	if (isActive) {
+		vector_push(columns, toggledId);
+	}
+
+	vector_free(gameContext.options.columns);
+	gameContext.options.columns = columns;
+	gameContext.options.columnsSet = true;
+
+	playerTable_applyColumns();
+	options_saveColumns();
+}
+
+static void appendColumnToggle(GtkBox *box, const uint16_t columnId) {
+	const char *title = columnId == COLUMN_NATIONALITIES ? "Nationality" : getColumnTitle(columnId);
+	GtkWidget *toggle = gtk_check_button_new_with_label(title);
+	g_signal_connect(toggle, "toggled", G_CALLBACK(onColumnToggled), GUINT_TO_POINTER(columnId));
+	gtk_box_append(box, toggle);
+	context.columnToggles[columnId] = GTK_CHECK_BUTTON(toggle);
+}
+
+static void appendPopoverHeading(GtkBox *box, const char *text) {
+	GtkWidget *heading = gtk_label_new(text);
+	gtk_widget_set_halign(heading, GTK_ALIGN_START);
+	gtk_widget_add_css_class(heading, "section-title");
+	gtk_widget_set_margin_top(heading, 6);
+	gtk_box_append(box, heading);
+}
+
+static void createColumnsPopover(void) {
+	GtkMenuButton *menuButton = GTK_MENU_BUTTON(gtk_builder_get_object(gameContext.builder, "menubutton:columns"));
+
+	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+	gtk_widget_add_css_class(box, "columns-menu");
+	appendPopoverHeading(GTK_BOX(box), "COLUMNS");
+	for (uint16_t i = 0; i < COLUMN_BUILTIN_COUNT; ++i) {
+		appendColumnToggle(GTK_BOX(box), i);
+	}
+
+	appendPopoverHeading(GTK_BOX(box), "ATTRIBUTES");
+	uint8_t sortedAttributes[ATTRIBUTE_COUNT];
+	attributes_getSortedByName(sortedAttributes);
+	for (uint8_t i = 0; i < ATTRIBUTE_COUNT; ++i) {
+		appendColumnToggle(GTK_BOX(box), (uint16_t)(COLUMN_ATTRIBUTE_FIRST + sortedAttributes[i]));
+	}
+
+	GtkWidget *scroll = gtk_scrolled_window_new();
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+	gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(scroll), 420);
+	gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(scroll), true);
+	gtk_scrolled_window_set_propagate_natural_width(GTK_SCROLLED_WINDOW(scroll), true);
+	gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
+
+	GtkWidget *popover = gtk_popover_new();
+	gtk_popover_set_child(GTK_POPOVER(popover), scroll);
+	gtk_menu_button_set_popover(menuButton, popover);
+}
+
+/** Opens Player Info for the selected row. Returns false when nothing is selected. */
+bool playerTable_openSelected(void) {
+	if (context.selection == NULL) {
+		return false;
+	}
+
+	const SearchPlayerRow *row = gtk_single_selection_get_selected_item(context.selection);
+	if (row == NULL || row->player == NULL) {
+		return false;
+	}
+
+	ui_createPlayerInfoWindow(row->player);
+	return true;
+}
+
+bool playerTable_hasFocus(void) {
+	if (context.table == NULL) {
+		return false;
+	}
+
+	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(context.table));
+	GtkWidget *focus = root != NULL ? gtk_root_get_focus(root) : NULL;
+	return focus != NULL && (focus == GTK_WIDGET(context.table) || gtk_widget_is_ancestor(focus, GTK_WIDGET(context.table)));
 }
 
 void playerTable_init(void) {
@@ -678,22 +987,28 @@ void playerTable_init(void) {
 	GtkColumnView *table = GTK_COLUMN_VIEW(GTK_WIDGET(gtk_builder_get_object(gameContext.builder, "table:player-list")));
 	context.table = table;
 
-	GtkColumnViewColumn *ratingColumn = createColumn("Rating", COLUMN_RATING, ratingSorter);
+	GtkSorter *sorters[COLUMN_COUNT] = {
+		[COLUMN_NAME] = nameSorter,
+		[COLUMN_AGE] = ageSorter,
+		[COLUMN_CA] = caSorter,
+		[COLUMN_PA] = paSorter,
+		[COLUMN_CA_PA_DELTA] = diffSorter,
+		[COLUMN_RATING] = ratingSorter,
+	};
+	for (uint16_t i = 0; i < COLUMN_COUNT; ++i) {
+		const bool isUnsortable = i == COLUMN_NATIONALITIES || i == COLUMN_POSITIONS || i == COLUMN_STATUS;
+		if (sorters[i] == NULL && !isUnsortable) {
+			sorters[i] = createCustomSorter(i);
+		}
 
-	gtk_column_view_append_column(table, createColumn("", COLUMN_NATIONALITIES, NULL));
-	gtk_column_view_append_column(table, createColumn("Name", COLUMN_NAME, nameSorter));
-	gtk_column_view_append_column(table, createColumn("Age", COLUMN_AGE, ageSorter));
-	gtk_column_view_append_column(table, createColumn("Positions", COLUMN_POSITIONS, NULL));
-	gtk_column_view_append_column(table, createColumn("CA", COLUMN_CA, caSorter));
-	gtk_column_view_append_column(table, createColumn("PA", COLUMN_PA, paSorter));
-	gtk_column_view_append_column(table, createColumn("Diff", COLUMN_CA_PA_DELTA, diffSorter));
-	gtk_column_view_append_column(table, createColumn("Status", COLUMN_STATUS, NULL));
-	gtk_column_view_append_column(table, ratingColumn);
-	gtk_column_view_append_column(table, createColumn("Value", COLUMN_VALUE, NULL));
-	gtk_column_view_append_column(table, createColumn("Club", COLUMN_CLUB, NULL));
-	gtk_column_view_append_column(table, createColumn("Home rep", COLUMN_REPUTATION_HOME, NULL));
-	gtk_column_view_append_column(table, createColumn("Current rep", COLUMN_REPUTATION_CURRENT, NULL));
-	gtk_column_view_append_column(table, createColumn("World rep", COLUMN_REPUTATION_WORLD, NULL));
+		GtkColumnViewColumn *column = createColumn(getColumnTitle(i), i, sorters[i]);
+		g_object_set_data(G_OBJECT(column), "column-id", GUINT_TO_POINTER(i));
+		gtk_column_view_append_column(table, column);
+		context.columns[i] = column;
+	}
+
+	createColumnsPopover();
+	playerTable_applyColumns();
 
 	context.selection = NULL;
 
@@ -705,7 +1020,7 @@ void playerTable_init(void) {
 	gameContext.searchResults = sharedPointer_new(NULL);
 	playerTable_clear();
 
-	gtk_column_view_sort_by_column(context.table, ratingColumn, GTK_SORT_DESCENDING);
+	gtk_column_view_sort_by_column(context.table, context.columns[COLUMN_RATING], GTK_SORT_DESCENDING);
 }
 
 static SearchPlayerRow *search_player_row_new(Player *player) {

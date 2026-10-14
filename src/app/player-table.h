@@ -19,3 +19,8 @@ struct _SearchPlayerRow {
 void playerTable_init(void);
 void playerTable_clear(void);
 void playerTable_populate(void);
+void playerTable_applyColumns(void);
+bool playerTable_columnFromKey(const char *key, uint16_t *outColumnId);
+const char *playerTable_columnKey(uint16_t columnId);
+bool playerTable_openSelected(void);
+bool playerTable_hasFocus(void);

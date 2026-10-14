@@ -3,8 +3,10 @@
 
 #include "options.h"
 #include "app/player.h"
+#include "app/player-table.h"
 #include "app/types.h"
 #include "app/ui.h"
+#include "app/helpers/attributes.h"
 #include "app/helpers/file-watcher.h"
 #include "app/helpers/vector.h"
 #include "core/logger.h"
@@ -18,71 +20,6 @@
 #define OPTIONS_FILE_NAME "options.yaml"
 #define OPTIONS_PATH_BUFFER_SIZE (4096 - 12)
 #define OPTIONS_LINE_BUFFER_SIZE 512
-
-static const char *attributeNames[ATTRIBUTE_COUNT] = {
-	"Crossing",
-	"Dribbling",
-	"Finishing",
-	"Heading",
-	"LongShots",
-	"Marking",
-	"OffTheBall",
-	"Passing",
-	"PenaltyTaking",
-	"Tackling",
-	"Vision",
-	"Handling",
-	"AerialReach",
-	"CommandOfArea",
-	"Communication",
-	"Kicking",
-	"Throwing",
-	"Anticipation",
-	"Decisions",
-	"OneOnOnes",
-	"Positioning",
-	"Reflexes",
-	"FirstTouch",
-	"Technique",
-	"LeftFoot",
-	"RightFoot",
-	"Flair",
-	"CornerTaking",
-	"Teamwork",
-	"WorkRate",
-	"LongThrows",
-	"Eccentricity",
-	"RushingOut",
-	"Punching",
-	"Acceleration",
-	"FreeKickTaking",
-	"Strength",
-	"Stamina",
-	"Pace",
-	"JumpingReach",
-	"Leadership",
-	"Dirtiness",
-	"Balance",
-	"Bravery",
-	"Consistency",
-	"Aggression",
-	"Agility",
-	"ImportantMatches",
-	"InjuryProneness",
-	"Versatility",
-	"NaturalFitness",
-	"Determination",
-	"Composure",
-	"Concentration",
-	"Adaptability",
-	"Ambition",
-	"Loyalty",
-	"Pressure",
-	"Professionalism",
-	"Sportsmanship",
-	"Temperament",
-	"Controversy",
-};
 
 static const char *positionGroupedCodes[POSITION_GROUPED_COUNT + 1] = {
 	"GK",
@@ -284,11 +221,9 @@ static void formationParser_positions(FormationParser *parser, char *value) {
 }
 
 static void formationParser_weight(RatingsParser *parser, const char *key, const char *value) {
-	for (uint8_t i = 0; i < ATTRIBUTE_COUNT; ++i) {
-		if (!strcasecmp(key, attributeNames[i])) {
-			vector_push(parser->current.weights, ((RatingWeight){.attribute = i, .weight = strtof(value, NULL)}));
-			return;
-		}
+	uint8_t attribute;
+	if (attributes_fromKey(key, &attribute)) {
+		vector_push(parser->current.weights, ((RatingWeight){.attribute = attribute, .weight = strtof(value, NULL)}));
 	}
 }
 
@@ -402,6 +337,28 @@ static void ratingsParser_line(RatingsParser *parser, char *cursor) {
 	ratingsParser_keyValue(parser, key, value);
 }
 
+// A space-separated list of column keys, in display order. Anything left out is hidden.
+static void parseColumns(const char *value) {
+	Options *options = &gameContext.options;
+	vector_free(options->columns);
+
+	char buffer[OPTIONS_LINE_BUFFER_SIZE];
+	snprintf(buffer, sizeof(buffer), "%s", value);
+
+	char *token = strtok(buffer, " \t");
+	while (token) {
+		uint16_t column;
+		if (playerTable_columnFromKey(token, &column)) {
+			vector_push(options->columns, column);
+		} else {
+			LOG_WARN("Unknown column '%s'", token);
+		}
+		token = strtok(NULL, " \t");
+	}
+
+	options->columnsSet = true;
+}
+
 static void applyOption(const char *key, const char *value) {
 	if (!strcmp(key, "dark-mode")) {
 		bool darkMode = false;
@@ -410,6 +367,11 @@ static void applyOption(const char *key, const char *value) {
 		} else {
 			LOG_WARN("Invalid boolean value '%s' for option '%s'", value, key);
 		}
+		return;
+	}
+
+	if (!strcmp(key, "columns")) {
+		parseColumns(value);
 		return;
 	}
 
@@ -428,6 +390,7 @@ static void setDefaults(void) {
 	Options *options = &gameContext.options;
 	freeWeights();
 	vector_free(options->formations);
+	vector_free(options->columns);
 	memset(options, 0, sizeof(*options));
 	options->darkMode = false;
 
@@ -585,12 +548,12 @@ static void writeDefaultOptions(const char *path) {
 		for (uint64_t j = 0; j < vector_length(options->weights[i].weights); ++j) {
 			const float weight = options->weights[i].weights[j].weight;
 			const uint8_t attribute = options->weights[i].weights[j].attribute;
-			if (weight > 0) {
+			if (weight != 0) {
 				if (isFirstAttribute) {
-					fprintf(file, "      - %s: %.2f\n", attributeNames[attribute], weight);
+					fprintf(file, "      - %s: %.2f\n", attributes_getKey(attribute), weight);
 					isFirstAttribute = false;
 				} else {
-					fprintf(file, "        %s: %.2f\n", attributeNames[attribute], weight);
+					fprintf(file, "        %s: %.2f\n", attributes_getKey(attribute), weight);
 				}
 			}
 		}
@@ -646,6 +609,8 @@ static void reloadOptions(void *userData) {
 
 	LOG_INFO("Reloaded options from '%s'", optionsPath);
 
+	playerTable_applyColumns();
+
 	// Recalculate player ratings in case the option file's weights have changed
 	for (uint64_t i = 0; i < gameContext.playerCount; ++i) {
 		getSortedPositionRatings(&gameContext.players[i]);
@@ -664,6 +629,58 @@ static void watchOptionsFile(void) {
 		return;
 	}
 	optionsWatcher = fileWatcher_create(optionsPath, reloadOptions, NULL);
+}
+
+/**
+ * Rewrites only the top-level `columns:` line of the options file, appending one if there is none,
+ * so comments and everything else in the file survive. The watcher then reloads the file as usual.
+ */
+void options_saveColumns(void) {
+	if (optionsPath[0] == '\0') {
+		return;
+	}
+
+	GString *columnsLine = g_string_new("columns:");
+	for (uint64_t i = 0; i < vector_length(gameContext.options.columns); ++i) {
+		g_string_append_printf(columnsLine, " %s", playerTable_columnKey(gameContext.options.columns[i]));
+	}
+
+	gchar *contents = NULL;
+	if (!g_file_get_contents(optionsPath, &contents, NULL, NULL)) {
+		contents = g_strdup("");
+	}
+
+	GString *output = g_string_new(NULL);
+	bool replaced = false;
+	gchar **lines = g_strsplit(contents, "\n", -1);
+	for (guint i = 0; lines[i] != NULL; ++i) {
+		// g_strsplit leaves an empty final element after the file's trailing newline
+		if (lines[i + 1] == NULL && lines[i][0] == '\0') {
+			break;
+		}
+
+		if (!replaced && g_str_has_prefix(lines[i], "columns:")) {
+			g_string_append(output, columnsLine->str);
+			replaced = true;
+		} else {
+			g_string_append(output, lines[i]);
+		}
+		g_string_append_c(output, '\n');
+	}
+	if (!replaced) {
+		g_string_append_printf(output, "%s\n", columnsLine->str);
+	}
+
+	GError *error = NULL;
+	if (!g_file_set_contents(optionsPath, output->str, (gssize)output->len, &error)) {
+		LOG_WARN("Could not save columns to '%s': %s", optionsPath, error->message);
+		g_clear_error(&error);
+	}
+
+	g_strfreev(lines);
+	g_free(contents);
+	g_string_free(output, TRUE);
+	g_string_free(columnsLine, TRUE);
 }
 
 void options_shutdown(void) {

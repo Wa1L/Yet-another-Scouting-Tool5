@@ -4,7 +4,12 @@
 #include "app/entities.h"
 #include "app/maths.h"
 #include "app/player.h"
+#include "app/shortlist.h"
 #include "app/ui.h"
+#include "app/callbacks/club-search.h"
+#include "app/callbacks/filters.h"
+#include "app/callbacks/nationality-search.h"
+#include "app/helpers/date.h"
 #include "app/helpers/formatter.h"
 #include "app/helpers/icons.h"
 #include "app/helpers/vector.h"
@@ -44,6 +49,170 @@ static void onPlayerInfoClicked(
 	(void)clickCount;
 }
 
+/**
+ * Clicking the club or a flag starts a fresh search for it, so earlier filters do not hide most of
+ * the squad, and brings the search window forward to show the results.
+ */
+static void onClubClicked(GtkGestureClick *gesture, const int clickCount, const double x, const double y, gpointer data) {
+	(void)gesture;
+	(void)clickCount;
+	(void)x;
+	(void)y;
+
+	const PlayerSnapshot *snapshot = data;
+	if (snapshot->count == 0 || entities_getClub(snapshot->players[0].clubIndex) == NULL) {
+		return;
+	}
+
+	const int64_t clubIndex = snapshot->players[0].clubIndex;
+	callbacks_onFiltersClear();
+	clubSearch_select(clubIndex);
+	ui_presentSearchWindow();
+}
+
+static void onFlagClicked(GtkGestureClick *gesture, const int clickCount, const double x, const double y, gpointer data) {
+	(void)gesture;
+	(void)clickCount;
+	(void)x;
+	(void)y;
+
+	const uint8_t nationIndex = (uint8_t)GPOINTER_TO_UINT(data);
+	if (entities_getNation(nationIndex) == NULL) {
+		return;
+	}
+
+	callbacks_onFiltersClear();
+	nationalitySearch_select(nationIndex);
+	ui_presentSearchWindow();
+}
+
+static void onShortlistClicked(GtkButton *button, gpointer data) {
+	(void)button;
+	const PlayerSnapshot *snapshot = data;
+	if (snapshot->count > 0) {
+		shortlist_toggle(&snapshot->players[0]);
+	}
+}
+
+static void onSimilarClicked(GtkButton *button, gpointer data) {
+	(void)button;
+	const PlayerSnapshot *snapshot = data;
+	if (snapshot->count > 0) {
+		ui_createSimilarPlayersWindow(&snapshot->players[0]);
+	}
+}
+
+/** Lower is better for these, so a fall is the improvement. */
+static bool isHigherBetter(const uint8_t attribute) {
+	return attribute != ATTR_INJ && attribute != ATTR_DIR && attribute != ATTR_CNY;
+}
+
+static void setTransferStatus(GtkBuilder *builder, const Player *player) {
+	const bool isListed = player->transferStatus & (TRANSFER_STATUS_LISTED | TRANSFER_STATUS_LISTED_BY_REQUEST);
+	const bool isLoanListed = player->transferStatus & TRANSFER_STATUS_LOAN_LISTED;
+
+	GtkWidget *pill = GTK_WIDGET(gtk_builder_get_object(builder, "widget:transfer-status"));
+	GtkLabel *label = GTK_LABEL(gtk_builder_get_object(builder, "label:transfer-status"));
+	gtk_widget_set_visible(pill, player->clubIndex != -1 && (isListed || isLoanListed));
+	if (isListed && isLoanListed) {
+		gtk_label_set_text(label, "🏷 Transfer & loan listed");
+	} else if (isListed) {
+		gtk_label_set_text(label, player->transferStatus & TRANSFER_STATUS_LISTED_BY_REQUEST
+			? "🏷 Listed by request"
+			: "🏷 Transfer listed");
+	} else {
+		gtk_label_set_text(label, "🏷 Loan listed");
+	}
+}
+
+static void setContract(GtkBuilder *builder, const Player *player) {
+	GtkLabel *label = GTK_LABEL(gtk_builder_get_object(builder, "label:contract"));
+	gtk_widget_remove_css_class(GTK_WIDGET(label), "contract-expiring");
+
+	if (player->clubIndex == -1 || player->contractEnd.year == 0) {
+		gtk_label_set_text(label, player->clubIndex == -1 ? "No contract" : "");
+		return;
+	}
+
+	char wage[FORMATTER_MONEY_SIZE];
+	char date[DATE_FORMAT_SIZE];
+	char buffer[FORMATTER_MONEY_SIZE + DATE_FORMAT_SIZE + 32];
+	formatter_formatMoneyShort(player->weeklyWage, false, wage);
+	date_format(player->contractEnd, date, sizeof(date));
+	snprintf(buffer, sizeof(buffer), "%s p/w  ·  Contract ends %s", wage, date);
+	gtk_label_set_text(label, buffer);
+
+	if (date_monthsUntil(player->contractEnd) <= 6) {
+		gtk_widget_add_css_class(GTK_WIDGET(label), "contract-expiring");
+	}
+}
+
+/** "Since 12 August 2026: CA +3 · PA +0 · …", for a shortlisted player. */
+static void setTracking(GtkBuilder *builder, const Player *player, const ShortlistEntry *entry) {
+	GtkLabel *label = GTK_LABEL(gtk_builder_get_object(builder, "label:tracking"));
+	GtkButton *shortlistButton = GTK_BUTTON(gtk_builder_get_object(builder, "button:shortlist"));
+	gtk_button_set_label(shortlistButton, entry != NULL ? "★ Shortlisted" : "☆ Shortlist");
+	gtk_widget_set_visible(GTK_WIDGET(label), entry != NULL);
+	if (entry == NULL) {
+		return;
+	}
+
+	char date[DATE_FORMAT_SIZE];
+	date_format(entry->since, date, sizeof(date));
+
+	char text[32];
+	char ca[FORMATTER_DELTA_SIZE];
+	char pa[FORMATTER_DELTA_SIZE];
+	char rating[FORMATTER_DELTA_SIZE];
+	char value[FORMATTER_DELTA_SIZE];
+
+	const int caChange = (int)player->ca - (int)entry->ca;
+	snprintf(text, sizeof(text), "CA %+d", caChange);
+	formatter_formatDelta(caChange, true, text, ca);
+
+	const int paChange = (int)player->pa - (int)entry->pa;
+	snprintf(text, sizeof(text), "PA %+d", paChange);
+	formatter_formatDelta(paChange, true, text, pa);
+
+	float ratingChange = player->ratings[0].value - shortlist_getBaselineRating(entry, player);
+	if (fabsf(ratingChange) < 0.05f) {
+		ratingChange = 0.f;
+	}
+	snprintf(text, sizeof(text), "Rating %+.1f", ratingChange);
+	formatter_formatDelta(ratingChange, true, text, rating);
+
+	const int64_t valueChange = (int64_t)player->guideValue - (int64_t)entry->value;
+	char money[FORMATTER_MONEY_SIZE];
+	formatter_formatMoneyShort(valueChange, true, money);
+	snprintf(text, sizeof(text), "Value %s", money);
+	formatter_formatDelta((double)valueChange, true, text, value);
+
+	char markup[FORMATTER_DELTA_SIZE * 4 + DATE_FORMAT_SIZE + 64];
+	snprintf(markup, sizeof(markup), "★ Since %s:  %s  ·  %s  ·  %s  ·  %s", date, ca, pa, rating, value);
+	gtk_label_set_markup(label, markup);
+}
+
+/** The attribute on the 1-20 scale, followed by its change since the player was shortlisted. */
+static void setAttributeText(GtkLabel *label, const Player *player, const ShortlistEntry *entry, const uint8_t attribute) {
+	const uint8_t value = convertTo20Scale(player->attributes[attribute]);
+	const int change = entry != NULL ? (int)value - (int)convertTo20Scale(entry->attributes[attribute]) : 0;
+
+	char text[24];
+	if (change == 0) {
+		snprintf(text, sizeof(text), "%u", value);
+		gtk_label_set_text(label, text);
+		return;
+	}
+
+	char changeText[8];
+	char changeMarkup[FORMATTER_DELTA_SIZE];
+	snprintf(changeText, sizeof(changeText), "%+d", change);
+	formatter_formatDelta(change, isHigherBetter(attribute), changeText, changeMarkup);
+	char markup[FORMATTER_DELTA_SIZE + 48];
+	snprintf(markup, sizeof(markup), "<span size=\"small\">%s</span> %u", changeMarkup, value);
+	gtk_label_set_markup(label, markup);
+}
+
 static void setPercentage(GtkBuilder *builder, const char *id, const int16_t basisPoints, const bool inverted) {
 	char buffer[FORMATTER_PERCENTAGE_SIZE];
 	formatter_formatPercentage(fabsf((float)basisPoints / 100.f), inverted, buffer);
@@ -76,6 +245,16 @@ void ui_createPlayerInfoWindow(const Player *player) {
 	g_object_set_data_full(G_OBJECT(context.window), "player-info:player", snapshot, playerSnapshot_free);
 
 	ui_renderPlayerInfoWindow(context);
+
+	GtkWidget *clubLabel = GTK_WIDGET(gtk_builder_get_object(context.builder, "label:club-name"));
+	gtk_widget_set_cursor_from_name(clubLabel, "pointer");
+	GtkGesture *clubGesture = gtk_gesture_click_new();
+	g_signal_connect(clubGesture, "released", G_CALLBACK(onClubClicked), snapshot);
+	gtk_widget_add_controller(clubLabel, GTK_EVENT_CONTROLLER(clubGesture));
+
+	g_signal_connect(gtk_builder_get_object(context.builder, "button:shortlist"), "clicked", G_CALLBACK(onShortlistClicked), snapshot);
+	g_signal_connect(gtk_builder_get_object(context.builder, "button:similar"), "clicked", G_CALLBACK(onSimilarClicked), snapshot);
+
 	GtkWidget *commonNameLabel = GTK_WIDGET(gtk_builder_get_object(context.builder, "label:common-name"));
 	GtkGestureClick *clickGesture = GTK_GESTURE_CLICK(gtk_gesture_click_new());
 	gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(clickGesture), GTK_PHASE_CAPTURE);
@@ -154,7 +333,18 @@ void ui_renderPlayerInfoWindow(WindowContext context) {
 		);
 		GtkWidget *flagImage = gtk_image_new_from_resource(pathToFlag);
 		gtk_box_append(nationalityBox, flagImage);
-		gtk_widget_set_tooltip_text(flagImage, nation->name);
+		char tooltip[MAX_NATION_STRING_LENGTH + 32];
+		snprintf(tooltip, sizeof(tooltip), "%s: click to show its players", nation->name);
+		gtk_widget_set_tooltip_text(flagImage, tooltip);
+		gtk_widget_set_cursor_from_name(flagImage, "pointer");
+		GtkGesture *flagGesture = gtk_gesture_click_new();
+		g_signal_connect(
+			flagGesture,
+			"released",
+			G_CALLBACK(onFlagClicked),
+			GUINT_TO_POINTER(player->nationality[nationalityIndex])
+		);
+		gtk_widget_add_controller(flagImage, GTK_EVENT_CONTROLLER(flagGesture));
 		nationalityIndex++;
 	}
 
@@ -167,6 +357,11 @@ void ui_renderPlayerInfoWindow(WindowContext context) {
 		gtk_label_set_text(clubNameLabel, club != NULL ? club->name : "");
 	}
 
+	setContract(context.builder, player);
+	setTransferStatus(context.builder, player);
+	const ShortlistEntry *shortlistEntry = shortlist_find(player->uid);
+	setTracking(context.builder, player, shortlistEntry);
+
 	const PositionWeights *positionWeights = getWeightsForPosition(player->ratings[0].position);
 	float max = 0;
 	for (uint64_t i = 0; i < vector_length(positionWeights->weights); ++i) {
@@ -175,15 +370,13 @@ void ui_renderPlayerInfoWindow(WindowContext context) {
 		}
 	}
 
-	char buffer[8] = {0};
 	char widgetId[64];
 	GtkLabel *label;
 	GtkWidget *widget;
 #define SET_ROW_TEXT_AND_HIGHLIGHT(id, attributeIndex) {																									\
-		snprintf(buffer, 8, "%d", convertTo20Scale(player->attributes[attributeIndex]));											\
 		snprintf(widgetId, 64, "label:%s", id);																																\
 		label = GTK_LABEL(GTK_WIDGET(gtk_builder_get_object(context.builder, widgetId)));											\
-		gtk_label_set_text(label, buffer);																																		\
+		setAttributeText(label, player, shortlistEntry, attributeIndex);																			\
 		snprintf(widgetId, 64, "row:%s", id);																																	\
 		widget = GTK_WIDGET(gtk_builder_get_object(context.builder, widgetId));																\
 		gtk_widget_remove_css_class(widget, "attribute-row--high");																						\

@@ -4,6 +4,7 @@
 #include "app/entities.h"
 #include "app/player.h"
 #include "app/ui.h"
+#include "app/helpers/date.h"
 #include "app/helpers/formatter.h"
 #include "app/helpers/ratings.h"
 #include "app/helpers/vector.h"
@@ -57,6 +58,155 @@ static void onPlayerRowClicked(
 );
 static void renderSquadDepthGrids(WindowContext context);
 
+// Squad planner thresholds
+#define PLANNER_AGEING_AGE 31
+#define PLANNER_EXPIRY_MONTHS 12
+#define PLANNER_WEAK_MARGIN 10.f
+
+/** What the planner needs to know about one position: how many can play it, and the top two. */
+typedef struct {
+	const Player *first;
+	const Player *second;
+	float firstRating;
+	uint32_t count;
+	uint8_t position;
+} PositionDepth;
+
+static bool isContractExpiring(const Player *player) {
+	return player->clubIndex != -1 &&
+		player->contractEnd.year != 0 &&
+		date_monthsUntil(player->contractEnd) <= PLANNER_EXPIRY_MONTHS;
+}
+
+static void appendPlannerRow(GtkBox *planner, const char *position, const char *text) {
+	GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+
+	GtkWidget *positionLabel = gtk_label_new(position);
+	gtk_widget_add_css_class(positionLabel, "planner-position");
+	gtk_widget_set_size_request(positionLabel, 44, -1);
+	gtk_widget_set_valign(positionLabel, GTK_ALIGN_START);
+	gtk_box_append(GTK_BOX(row), positionLabel);
+
+	GtkWidget *textLabel = gtk_label_new(text);
+	gtk_label_set_xalign(GTK_LABEL(textLabel), 0.f);
+	gtk_label_set_wrap(GTK_LABEL(textLabel), true);
+	gtk_widget_set_hexpand(textLabel, true);
+	gtk_box_append(GTK_BOX(row), textLabel);
+
+	gtk_box_append(planner, row);
+}
+
+/**
+ * One player is often the top option in several positions, so their expiring contract is only
+ * mentioned the first time. `warnedUids` collects who has been mentioned already.
+ */
+static void appendContractWarning(GtkBox *planner, const char *position, const Player *player, GHashTable *warnedUids) {
+	if (
+		player == NULL ||
+		!isContractExpiring(player) ||
+		!g_hash_table_add(warnedUids, GUINT_TO_POINTER(player->uid))
+	) {
+		return;
+	}
+
+	char name[PLAYER_DISPLAY_NAME_LENGTH];
+	player_getDisplayName(player, name, sizeof(name));
+	const int32_t months = date_monthsUntil(player->contractEnd);
+
+	char text[160];
+	if (months < 1) {
+		snprintf(text, sizeof(text), "%s's contract ends within the month.", name);
+	} else {
+		snprintf(text, sizeof(text), "%s's contract ends in %d month%s.", name, months, months == 1 ? "" : "s");
+	}
+	appendPlannerRow(planner, position, text);
+}
+
+/**
+ * Flags positions that need attention: nobody or only one player to pick from, a first choice and
+ * understudy who are both ageing, either of them out of contract within a year, and a first choice
+ * well below the standard of the rest of the selected positions.
+ */
+static void renderPlanner(GtkBox *planner, const PositionDepth *depths, const uint32_t depthCount) {
+	GtkWidget *child;
+	while ((child = gtk_widget_get_first_child(GTK_WIDGET(planner))) != NULL) {
+		gtk_box_remove(planner, child);
+	}
+
+	float ratingTotal = 0.f;
+	uint32_t ratedCount = 0;
+	for (uint32_t i = 0; i < depthCount; ++i) {
+		if (depths[i].first != NULL) {
+			ratingTotal += depths[i].firstRating;
+			++ratedCount;
+		}
+	}
+	const float averageRating = ratedCount > 0 ? ratingTotal / (float)ratedCount : 0.f;
+
+	GHashTable *warnedUids = g_hash_table_new(g_direct_hash, g_direct_equal);
+	char text[256];
+	char firstName[PLAYER_DISPLAY_NAME_LENGTH];
+	char secondName[PLAYER_DISPLAY_NAME_LENGTH];
+	for (uint32_t i = 0; i < depthCount; ++i) {
+		const PositionDepth *depth = &depths[i];
+		const char *position = positionCodeNames[depth->position];
+
+		if (depth->count == 0) {
+			appendPlannerRow(planner, position, "Nobody in your search results can play here.");
+			continue;
+		}
+
+		player_getDisplayName(depth->first, firstName, sizeof(firstName));
+		if (depth->count == 1) {
+			snprintf(text, sizeof(text), "No cover: %s is the only option.", firstName);
+			appendPlannerRow(planner, position, text);
+		}
+
+		if (
+			depth->first->age >= PLANNER_AGEING_AGE &&
+			(depth->second == NULL || depth->second->age >= PLANNER_AGEING_AGE)
+		) {
+			if (depth->second == NULL) {
+				snprintf(text, sizeof(text), "Ageing: %s is %u.", firstName, depth->first->age);
+			} else {
+				player_getDisplayName(depth->second, secondName, sizeof(secondName));
+				snprintf(
+					text,
+					sizeof(text),
+					"Ageing: both options are %d or older (%s, %u, and %s, %u).",
+					PLANNER_AGEING_AGE,
+					firstName,
+					depth->first->age,
+					secondName,
+					depth->second->age
+				);
+			}
+			appendPlannerRow(planner, position, text);
+		}
+
+		appendContractWarning(planner, position, depth->first, warnedUids);
+		appendContractWarning(planner, position, depth->second, warnedUids);
+
+		if (ratedCount > 1 && depth->firstRating < averageRating - PLANNER_WEAK_MARGIN) {
+			snprintf(
+				text,
+				sizeof(text),
+				"Weak: the best option, %s, rates %.1f against an average of %.1f across these positions.",
+				firstName,
+				depth->firstRating,
+				averageRating
+			);
+			appendPlannerRow(planner, position, text);
+		}
+	}
+
+	g_hash_table_destroy(warnedUids);
+
+	if (gtk_widget_get_first_child(GTK_WIDGET(planner)) == NULL) {
+		appendPlannerRow(planner, "✓", "No problems spotted across the selected positions.");
+	}
+}
+
 void ui_createSquadDepthWindow(void) {
 	// The window works from its own copy of the results: the indices point into a buffer the cache
 	// is free to replace, and the players themselves are re-matched by uid after every publish.
@@ -67,7 +217,7 @@ void ui_createSquadDepthWindow(void) {
 		return;
 	}
 
-	const WindowContext context = openWindow("squad-depth", "window:squad-depth", WINDOW_BEST_XI, snapshot);
+	const WindowContext context = openWindow("squad-depth", "window:squad-depth", WINDOW_SQUAD_DEPTH, snapshot);
 	g_object_set_data_full(G_OBJECT(context.window), "squad-depth:players", snapshot, playerSnapshot_free);
 
 	WindowContext *cbContext = g_new(WindowContext, 1);
@@ -161,6 +311,8 @@ static void renderSquadDepthGrids(const WindowContext context) {
 	const uint32_t playerCount = snapshot != NULL ? snapshot->count : 0;
 	// One scratch buffer shared by every grid: no position can hold more than the whole snapshot.
 	DepthRow *depthRows = playerCount > 0 ? g_new(DepthRow, playerCount) : NULL;
+	PositionDepth plannedPositions[G_N_ELEMENTS(positionFilters)];
+	uint32_t plannedCount = 0;
 
 	int32_t row = 0;
 	int32_t column = 0;
@@ -231,6 +383,14 @@ static void renderSquadDepthGrids(const WindowContext context) {
 			qsort(depthRows, depthCount, sizeof(*depthRows), compareDepthRows);
 		}
 
+		plannedPositions[plannedCount++] = (PositionDepth){
+			.first = depthCount > 0 ? depthRows[0].player : NULL,
+			.second = depthCount > 1 ? depthRows[1].player : NULL,
+			.firstRating = depthCount > 0 ? depthRows[0].rating : 0.f,
+			.count = depthCount,
+			.position = positionFilters[i],
+		};
+
 		#define SQUAD_DEPTH_MAX_ROWS 20
 		const uint8_t maxRows = depthCount > SQUAD_DEPTH_MAX_ROWS ? SQUAD_DEPTH_MAX_ROWS : (uint8_t)depthCount;
 		for (uint32_t j = 0; j < maxRows; ++j) {
@@ -276,6 +436,15 @@ static void renderSquadDepthGrids(const WindowContext context) {
 			gtk_widget_set_size_request(ratingLabel, 70, -1);
 
 			gtk_box_append(playerRowBox, nameLabel);
+			if (isContractExpiring(player)) {
+				char date[DATE_FORMAT_SIZE];
+				char tooltip[DATE_FORMAT_SIZE + 24];
+				date_format(player->contractEnd, date, sizeof(date));
+				snprintf(tooltip, sizeof(tooltip), "Contract ends %s", date);
+				GtkWidget *expiringLabel = gtk_label_new("⏳");
+				gtk_widget_set_tooltip_text(expiringLabel, tooltip);
+				gtk_box_append(playerRowBox, expiringLabel);
+			}
 			gtk_box_append(playerRowBox, ageLabel);
 			gtk_box_append(playerRowBox, ratingLabel);
 			gtk_box_append(depthBox, playerRowBoxWidget);
@@ -292,4 +461,6 @@ static void renderSquadDepthGrids(const WindowContext context) {
 	}
 
 	g_free(depthRows);
+
+	renderPlanner(GTK_BOX(gtk_builder_get_object(b, "box:planner")), plannedPositions, plannedCount);
 }

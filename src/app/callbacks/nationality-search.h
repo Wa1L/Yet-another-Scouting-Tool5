@@ -9,5 +9,6 @@
 
 
 void nationalitySearch_init(void);
+bool nationalitySearch_select(uint8_t nationIndex);
 void callbacks_onNationalityChange(GtkEditable *editable, const SearchDatalist *datalist);
 void callbacks_onNationalitySelected(const GtkListBox *box, GtkListBoxRow *row, const SearchDatalist *datalist);

@@ -150,3 +150,44 @@ void formatter_formatPercentage(const float percentage, const bool inverted, cha
 		clamped
 	);
 }
+
+/**
+ * Abbreviates an amount of money the way FM does: £950, £450K, £2.5M. Negative amounts keep their
+ * sign, and `showPlus` adds one to positive amounts so the result reads as a change.
+ * @param outString - should be at least FORMATTER_MONEY_SIZE bytes
+ */
+void formatter_formatMoneyShort(const int64_t value, const bool showPlus, char *outString) {
+	const char *sign = value < 0 ? "-" : (showPlus && value > 0 ? "+" : "");
+	const double magnitude = fabs((double)value);
+
+	if (magnitude >= 1e9) {
+		snprintf(outString, FORMATTER_MONEY_SIZE, "%s£%.2fB", sign, magnitude / 1e9);
+	} else if (magnitude >= 1e6) {
+		snprintf(outString, FORMATTER_MONEY_SIZE, "%s£%.1fM", sign, magnitude / 1e6);
+	} else if (magnitude >= 1e3) {
+		snprintf(outString, FORMATTER_MONEY_SIZE, "%s£%.0fK", sign, magnitude / 1e3);
+	} else {
+		snprintf(outString, FORMATTER_MONEY_SIZE, "%s£%.0f", sign, magnitude);
+	}
+}
+
+/**
+ * Wraps `text` in green markup when `delta` is an improvement and red when it is a decline, leaving
+ * it plain when nothing changed. `text` must not contain markup characters.
+ * @param outString - should be at least FORMATTER_DELTA_SIZE bytes
+ */
+void formatter_formatDelta(const double delta, const bool higherIsBetter, const char *text, char *outString) {
+	if (delta == 0.0) {
+		snprintf(outString, FORMATTER_DELTA_SIZE, "%s", text);
+		return;
+	}
+
+	const bool isImprovement = (delta > 0.0) == higherIsBetter;
+	snprintf(
+		outString,
+		FORMATTER_DELTA_SIZE,
+		"<span foreground=\"%s\">%s</span>",
+		qualityRampHex[isImprovement ? 120 : 0],
+		text
+	);
+}

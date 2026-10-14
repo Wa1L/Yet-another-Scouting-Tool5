@@ -4,6 +4,8 @@
 #include "search-handler.h"
 #include "app/player-table.h"
 #include "app/search.h"
+#include "app/helpers/attributes.h"
+#include "app/helpers/text.h"
 
 #include <gtk/gtk.h>
 
@@ -12,6 +14,162 @@ extern GameContext gameContext;
 
 static inline bool valueFitsOneByte(int64_t value) {
 	return value >= 0 && value <= 0xFF;
+}
+
+/** Reads a whole number in [0, max] from `buffer`; false when it is empty or out of range. */
+static bool readNumber(GtkEntryBuffer *buffer, const int64_t max, int64_t *outValue) {
+	const gchar *text = gtk_entry_buffer_get_text(buffer);
+	if (text == NULL || *text == '\0') {
+		return false;
+	}
+
+	const int64_t value = g_ascii_strtoll(text, NULL, 10);
+	if (value < 0 || value > max) {
+		return false;
+	}
+
+	*outValue = value;
+	return true;
+}
+
+/**
+ * Reads an amount of money, accepting the shorthand people actually type: "450k", "2.5m" and
+ * "1,200,000" all work. False when the buffer is empty or does not hold a usable amount.
+ */
+bool searchHandler_parseMoney(const char *text, uint32_t *outValue) {
+	if (text == NULL || *text == '\0') {
+		return false;
+	}
+
+	char digits[32];
+	size_t length = 0;
+	for (const char *c = text; *c != '\0' && length + 1 < sizeof(digits); ++c) {
+		if (*c != ',' && *c != ' ' && *c != '\xC2' && *c != '\xA3') { // Skip separators and "£"
+			digits[length++] = *c;
+		}
+	}
+	digits[length] = '\0';
+
+	char *end = NULL;
+	double value = g_ascii_strtod(digits, &end);
+	if (end == digits) {
+		return false;
+	}
+	if (*end == 'k' || *end == 'K') {
+		value *= 1e3;
+	} else if (*end == 'm' || *end == 'M') {
+		value *= 1e6;
+	} else if (*end == 'b' || *end == 'B') {
+		value *= 1e9;
+	}
+
+	if (value < 0 || value > (double)UINT32_MAX) {
+		return false;
+	}
+
+	*outValue = (uint32_t)value;
+	return true;
+}
+
+static bool readMoney(GtkEntryBuffer *buffer, uint32_t *outValue) {
+	return searchHandler_parseMoney(gtk_entry_buffer_get_text(buffer), outValue);
+}
+
+/** The attribute picked in an attribute filter's dropdown, or ATTRIBUTE_COUNT for none. */
+uint8_t searchHandler_getDropDownAttribute(GtkDropDown *dropDown) {
+	const guint selected = gtk_drop_down_get_selected(dropDown);
+	if (selected == 0 || selected > ATTRIBUTE_COUNT) {
+		return ATTRIBUTE_COUNT;
+	}
+
+	// The dropdown lists a placeholder followed by every attribute sorted by name
+	uint8_t sorted[ATTRIBUTE_COUNT];
+	attributes_getSortedByName(sorted);
+	return sorted[selected - 1];
+}
+
+static void cacheAdditionalFilters(FilterOptions *options) {
+	const FilterBuffer *fb = &gameContext.filterBuffer;
+	const FilterControls *controls = &gameContext.filterControls;
+	int64_t value;
+
+	const char *name = gtk_editable_get_text(GTK_EDITABLE(controls->name));
+	text_fold(name != NULL ? name : "", options->name, sizeof(options->name));
+	g_strstrip(options->name);
+	if (options->name[0] != '\0') {
+		options->filterMask |= FILTER_HAS_NAME;
+	}
+
+	if (readMoney(fb->minValue, &options->minValue)) {
+		options->filterMask |= FILTER_HAS_MIN_VALUE;
+	}
+	if (readMoney(fb->maxValue, &options->maxValue)) {
+		options->filterMask |= FILTER_HAS_MAX_VALUE;
+	}
+
+	struct {
+		GtkEntryBuffer *buffer;
+		uint16_t *target;
+		uint32_t flag;
+	} reputations[] = {
+		{fb->minHomeReputation, &options->minHomeReputation, FILTER_HAS_MIN_HOME_REPUTATION},
+		{fb->maxHomeReputation, &options->maxHomeReputation, FILTER_HAS_MAX_HOME_REPUTATION},
+		{fb->minCurrentReputation, &options->minCurrentReputation, FILTER_HAS_MIN_CURRENT_REPUTATION},
+		{fb->maxCurrentReputation, &options->maxCurrentReputation, FILTER_HAS_MAX_CURRENT_REPUTATION},
+		{fb->minWorldReputation, &options->minWorldReputation, FILTER_HAS_MIN_WORLD_REPUTATION},
+		{fb->maxWorldReputation, &options->maxWorldReputation, FILTER_HAS_MAX_WORLD_REPUTATION},
+	};
+	for (size_t i = 0; i < G_N_ELEMENTS(reputations); ++i) {
+		if (readNumber(reputations[i].buffer, UINT16_MAX, &value)) {
+			*reputations[i].target = (uint16_t)value;
+			options->filterMask |= reputations[i].flag;
+		}
+	}
+
+	if (readMoney(fb->maxWage, &options->maxWage)) {
+		options->filterMask |= FILTER_HAS_MAX_WAGE;
+	}
+	if (readNumber(fb->contractMonths, 1200, &value)) {
+		options->contractMonths = (uint16_t)value;
+		options->filterMask |= FILTER_HAS_CONTRACT_EXPIRY;
+	}
+
+	options->transferStatus = (uint8_t)gtk_drop_down_get_selected(controls->transferStatus);
+	if (options->transferStatus != TRANSFER_FILTER_ANY && options->transferStatus <= TRANSFER_FILTER_EITHER) {
+		options->filterMask |= FILTER_HAS_TRANSFER_STATUS;
+	}
+	options->foot = (uint8_t)gtk_drop_down_get_selected(controls->foot);
+	if (options->foot != FOOT_FILTER_ANY && options->foot <= FOOT_FILTER_EITHER) {
+		options->filterMask |= FILTER_HAS_FOOT;
+	}
+
+	if (gtk_check_button_get_active(controls->unattached)) {
+		options->filterMask |= FILTER_HAS_UNATTACHED;
+	}
+	if (gtk_check_button_get_active(controls->fastLearner)) {
+		options->filterMask |= FILTER_HAS_FAST_LEARNER;
+	}
+	if (gtk_check_button_get_active(controls->hotProspect)) {
+		options->filterMask |= FILTER_HAS_HOT_PROSPECT;
+	}
+
+	for (uint8_t i = 0; i < ATTRIBUTE_FILTER_COUNT; ++i) {
+		AttributeFilter *filter = &options->attributes[i];
+		*filter = (AttributeFilter){.attribute = searchHandler_getDropDownAttribute(controls->attribute[i])};
+		if (filter->attribute >= ATTRIBUTE_COUNT) {
+			continue;
+		}
+
+		if (readNumber(fb->minAttribute[i], 20, &value)) {
+			filter->min = (uint8_t)value;
+		}
+		if (readNumber(fb->maxAttribute[i], 20, &value)) {
+			filter->max = (uint8_t)value;
+		}
+		if (filter->min || filter->max) {
+			options->filterMask |= FILTER_HAS_ATTRIBUTE;
+		}
+	}
 }
 
 void searchHandler_cacheFilters(void) {
@@ -114,6 +272,8 @@ void searchHandler_cacheFilters(void) {
 		options->maxRating = (float)g_ascii_strtod(maxRating, NULL);
 		options->filterMask |= FILTER_HAS_MAX_RATING;
 	}
+
+	cacheAdditionalFilters(options);
 }
 
 void searchHandler_doSearch(const bool refreshFilterCache) {
@@ -134,6 +294,37 @@ void searchHandler_clearFilters(void) {
 	gtk_entry_buffer_set_text(gameContext.filterBuffer.maxPA, "", 1);
 	gtk_entry_buffer_set_text(gameContext.filterBuffer.minRating, "", 1);
 	gtk_entry_buffer_set_text(gameContext.filterBuffer.maxRating, "", 1);
+
+	FilterBuffer *fb = &gameContext.filterBuffer;
+	GtkEntryBuffer *const buffers[] = {
+		fb->minValue,
+		fb->maxValue,
+		fb->minHomeReputation,
+		fb->maxHomeReputation,
+		fb->minCurrentReputation,
+		fb->maxCurrentReputation,
+		fb->minWorldReputation,
+		fb->maxWorldReputation,
+		fb->maxWage,
+		fb->contractMonths,
+	};
+	for (size_t i = 0; i < G_N_ELEMENTS(buffers); ++i) {
+		gtk_entry_buffer_set_text(buffers[i], "", 0);
+	}
+
+	const FilterControls *controls = &gameContext.filterControls;
+	for (uint8_t i = 0; i < ATTRIBUTE_FILTER_COUNT; ++i) {
+		gtk_entry_buffer_set_text(fb->minAttribute[i], "", 0);
+		gtk_entry_buffer_set_text(fb->maxAttribute[i], "", 0);
+		gtk_drop_down_set_selected(controls->attribute[i], 0);
+	}
+	gtk_editable_set_text(GTK_EDITABLE(controls->name), "");
+	gtk_drop_down_set_selected(controls->foot, FOOT_FILTER_ANY);
+	gtk_drop_down_set_selected(controls->transferStatus, TRANSFER_FILTER_ANY);
+	gtk_check_button_set_active(controls->unattached, FALSE);
+	gtk_check_button_set_active(controls->fastLearner, FALSE);
+	gtk_check_button_set_active(controls->hotProspect, FALSE);
+
 	gtk_editable_set_text(GTK_EDITABLE(gameContext.clubDatalist->entry), "");
 	gtk_editable_set_text(GTK_EDITABLE(gameContext.nationalityDatalist->entry), "");
 

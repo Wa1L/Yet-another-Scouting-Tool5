@@ -87,6 +87,20 @@ typedef struct {
 	uint8_t treatmentMask;
 } Injury;
 
+// Bit flags read from a contract's transfer status byte
+#define TRANSFER_STATUS_LISTED 0x01
+#define TRANSFER_STATUS_LOAN_LISTED 0x02
+#define TRANSFER_STATUS_LISTED_BY_REQUEST 0x08
+#define TRANSFER_STATUS_NOT_FOR_SALE 0x10
+
+typedef enum {
+	FOOT_EITHER,
+	FOOT_LEFT,
+	FOOT_LEFT_ONLY,
+	FOOT_RIGHT,
+	FOOT_RIGHT_ONLY,
+} FootPreference;
+
 typedef struct {
 	uint8_t attributes[ATTRIBUTE_COUNT];
 	Rating ratings[POSITION_GROUPED_COUNT];
@@ -102,8 +116,9 @@ typedef struct {
 	uint32_t rid;
 	uint32_t uid;
 	uint32_t guideValue;
-	uint32_t annualWage;
+	uint32_t weeklyWage;
 	Date dateOfBirth;
+	Date contractEnd; // Zeroed when the player has no contract
 	uint16_t sharpness;
 	int16_t fatigue;
 	uint16_t condition;
@@ -118,6 +133,7 @@ typedef struct {
 	uint8_t height;
 	uint8_t weight;
 	uint8_t morale;
+	uint8_t transferStatus; // TRANSFER_STATUS_* bit flags
 	bool canDevelopQuickly;
 	bool isHotProspect;
 } Player;

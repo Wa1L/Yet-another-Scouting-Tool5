@@ -6,6 +6,7 @@
 #include "app/maths.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 
 
 // printNumber grows the string in place and printCurrency prefixes it, so callers of either must
@@ -19,6 +20,8 @@
 #define FORMATTER_RATING_SIZE 44
 #define FORMATTER_RATING_PLAIN_SIZE 16
 #define FORMATTER_PERCENTAGE_SIZE 40
+#define FORMATTER_MONEY_SIZE 24
+#define FORMATTER_DELTA_SIZE 72
 
 void formatter_init(void);
 void formatter_printNumber(char *outString);
@@ -27,3 +30,5 @@ void formatter_formatRating(float rating, char *outString);
 void formatter_formatRatingPlain(float rating, char *outString);
 void formatter_formatPercentage(float percentage, bool inverted, char *outString);
 RGB formatter_qualityColour(uint8_t value);
+void formatter_formatMoneyShort(int64_t value, bool showPlus, char *outString);
+void formatter_formatDelta(double delta, bool higherIsBetter, const char *text, char *outString);

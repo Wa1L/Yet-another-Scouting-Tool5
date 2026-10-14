@@ -32,6 +32,7 @@ static void assignFormation(
 	uint32_t playerCount,
 	const PositionCode positions[FORMATION_POSITION_COUNT],
 	BestElevenFilters filters,
+	const bool *excluded,
 	BestElevenRow outSlots[FORMATION_POSITION_COUNT]
 );
 static void renderBestElevenTable(WindowContext context);
@@ -44,6 +45,7 @@ static void onPlayerNameClicked(
 	const Player *player
 );
 static void onFilterChange(GObject *object, gpointer userData);
+static void onFindUpgradesClicked(GtkButton *button, gpointer userData);
 
 void ui_createBestElevenWindow(void) {
 	// The window works from its own copy of the results: the indices point into a buffer the cache
@@ -77,6 +79,10 @@ void ui_createBestElevenWindow(void) {
 	g_signal_connect(spinMinCondition, "value-changed", G_CALLBACK(onFilterChange), cbContext);
 	g_signal_connect(spinMaxCondition, "value-changed", G_CALLBACK(onFilterChange), cbContext);
 	g_signal_connect(checkboxExcludeInjured, "toggled", G_CALLBACK(onFilterChange), cbContext);
+	GtkWidget *checkboxShowBench = GTK_WIDGET(gtk_builder_get_object(context.builder, "checkbox:best-xi:show-bench"));
+	g_signal_connect(checkboxShowBench, "toggled", G_CALLBACK(onFilterChange), cbContext);
+	GtkWidget *buttonFindUpgrades = GTK_WIDGET(gtk_builder_get_object(context.builder, "button:find-upgrades"));
+	g_signal_connect(buttonFindUpgrades, "clicked", G_CALLBACK(onFindUpgradesClicked), cbContext);
 
 	ui_renderBestElevenWindow(context);
 	ui_presentWindow(context);
@@ -111,22 +117,16 @@ void ui_rebindBestElevenWindow(const WindowContext context, const PlayerLookup *
 	renderBestElevenTable(context);
 }
 
-static void renderBestElevenTable(const WindowContext context) {
+static const Formation *getSelectedFormation(const WindowContext context) {
 	GtkDropDown *formationDropDown = GTK_DROP_DOWN(gtk_builder_get_object(context.builder, "dropdown:formation"));
 	uint32_t selectedFormationIndex = gtk_drop_down_get_selected(formationDropDown);
-	if (selectedFormationIndex == GTK_INVALID_LIST_POSITION) {
+	if (selectedFormationIndex >= vector_length(gameContext.options.formations)) {
 		selectedFormationIndex = 0;
 	}
-	const Formation formation = gameContext.options.formations[selectedFormationIndex];
+	return &gameContext.options.formations[selectedFormationIndex];
+}
 
-	const PlayerSnapshot *snapshot = context.data;
-
-	GtkListBox *listBox = GTK_LIST_BOX(gtk_builder_get_object(context.builder, "list-box:best-xi"));
-	gtk_list_box_remove_all(listBox);
-
-	const Player *players = snapshot != NULL ? snapshot->players : NULL;
-	const uint32_t playerCount = snapshot != NULL ? snapshot->count : 0;
-
+static BestElevenFilters getFilters(const WindowContext context) {
 	GtkSpinButton *spinMinAge = GTK_SPIN_BUTTON(gtk_builder_get_object(context.builder, "spin:min-age"));
 	GtkSpinButton *spinMaxAge = GTK_SPIN_BUTTON(gtk_builder_get_object(context.builder, "spin:max-age"));
 	GtkSpinButton *spinMinCondition = GTK_SPIN_BUTTON(gtk_builder_get_object(context.builder, "spin:min-condition"));
@@ -135,7 +135,7 @@ static void renderBestElevenTable(const WindowContext context) {
 		gtk_builder_get_object(context.builder, "checkbox:best-xi:exclude-injured")
 	);
 
-	const BestElevenFilters filters = {
+	return (BestElevenFilters){
 		.excludeInjured = gtk_check_button_get_active(checkboxExcludeInjured),
 		.maxAge = (uint8_t)gtk_spin_button_get_value_as_int(spinMaxAge),
 		.minAge = (uint8_t)gtk_spin_button_get_value_as_int(spinMinAge),
@@ -143,114 +143,120 @@ static void renderBestElevenTable(const WindowContext context) {
 		.minCondition = (uint16_t)gtk_spin_button_get_value_as_int(spinMinCondition) * 100,
 		.maxCondition = (uint16_t)gtk_spin_button_get_value_as_int(spinMaxCondition) * 100,
 	};
+}
 
-	BestElevenRow rows[FORMATION_POSITION_COUNT] = {0};
-#ifdef DEBUG
-	const int64_t timeStart = platform_getMicroseconds();
-#endif
-	assignFormation(players, playerCount, formation.positions, filters, rows);
-	LOG_DEBUG(
-		"Found best XI for %" PRIu32 " players in %" PRId64 " microseconds",
-		playerCount,
-		platform_getMicroseconds() - timeStart
-	);
+static void appendLabelRow(GtkListBox *listBox, const char *markup, const char *cssClass, const GtkAlign halign) {
+	GtkWidget *label = gtk_label_new("");
+	gtk_label_set_markup(GTK_LABEL(label), markup);
+	gtk_widget_set_halign(label, halign);
+	GtkWidget *widgetRow = gtk_list_box_row_new();
+	GtkListBoxRow *row = GTK_LIST_BOX_ROW(widgetRow);
+	gtk_widget_add_css_class(widgetRow, cssClass);
+	gtk_widget_set_hexpand(widgetRow, true);
+	gtk_list_box_row_set_activatable(row, false);
+	gtk_list_box_row_set_selectable(row, false);
+	gtk_list_box_row_set_child(row, label);
+	gtk_list_box_append(listBox, widgetRow);
+}
 
+/** Appends one slot of a line-up and returns the rating it contributes, or 0 when it is empty. */
+static float appendPlayerRow(GtkListBox *listBox, const PositionCode position, const Player *player) {
+	GtkWidget *widgetRow = gtk_list_box_row_new();
+	GtkListBoxRow *row = GTK_LIST_BOX_ROW(widgetRow);
+	gtk_list_box_row_set_activatable(row, false);
+	gtk_list_box_row_set_selectable(row, false);
+	gtk_list_box_append(listBox, widgetRow);
+
+	GtkWidget *widgetGrid = gtk_grid_new();
+	GtkGrid *grid = GTK_GRID(widgetGrid);
+	gtk_grid_set_column_spacing(grid, 12);
+
+	GtkWidget *widgetLabelPosition = gtk_label_new(positionCodeNames[position]);
+	gtk_label_set_yalign(GTK_LABEL(widgetLabelPosition), GTK_ALIGN_CENTER);
+	gtk_widget_add_css_class(widgetLabelPosition, "position");
+
+	GtkWidget *widgetBoxNationality = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+	GtkWidget *widgetLabelPlayer = gtk_label_new("");
+	GtkWidget *widgetLabelAge = gtk_label_new("");
+	GtkWidget *widgetHeart;
+	GtkWidget *widgetLabelRating = gtk_label_new("");
+
+	if (player != NULL) {
+		gtk_widget_set_hexpand(widgetLabelPlayer, true);
+		gtk_label_set_xalign(GTK_LABEL(widgetLabelPlayer), 0);
+		gtk_label_set_yalign(GTK_LABEL(widgetLabelPlayer), GTK_ALIGN_CENTER);
+		gtk_widget_add_css_class(widgetLabelPlayer, "name");
+
+		// Name
+		char nameBuffer[PLAYER_DISPLAY_NAME_LENGTH];
+		player_getDisplayName(player, nameBuffer, sizeof(nameBuffer));
+		gtk_label_set_text(GTK_LABEL(widgetLabelPlayer), nameBuffer);
+
+		// Age
+		char ageBuffer[8];
+		snprintf(ageBuffer, sizeof(ageBuffer), "%d yrs", player->age);
+		gtk_label_set_text(GTK_LABEL(widgetLabelAge), ageBuffer);
+
+		// Rating
+		char ratingBuffer[FORMATTER_RATING_SIZE];
+		formatter_formatRating(player->ratings[0].value, ratingBuffer);
+		gtk_label_set_markup(GTK_LABEL(widgetLabelRating), ratingBuffer);
+		gtk_label_set_xalign(GTK_LABEL(widgetLabelRating), 1.f);
+
+		// Country flag
+		const Nation *nation = entities_getNation(player->nationality[0]);
+		if (nation != NULL) {
+			char pathToFlag[256] = {0};
+			snprintf(
+				pathToFlag,
+				sizeof(pathToFlag),
+				RESOURCE_BASE "/assets/flags/%s.png",
+				nation->code
+			);
+			GtkWidget *flagImage = gtk_image_new_from_resource(pathToFlag);
+			gtk_box_append(GTK_BOX(widgetBoxNationality), flagImage);
+			gtk_widget_set_tooltip_text(flagImage, nation->name);
+		}
+
+		if (player->injury.duration > 0) {
+			widgetHeart = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+			GtkWidget *label = gtk_label_new("🚑");
+			gtk_box_append(GTK_BOX(widgetHeart), label);
+			char buffer[128] = {0};
+			snprintf(buffer, 128, "Injured: %s", injuryNames_get(player->injury.nameIndex));
+			gtk_widget_set_tooltip_text(label, buffer);
+		} else {
+			widgetHeart = icons_new(ICON_HEART, icons_conditionQuantise(player->condition));
+		}
+
+		GtkGesture *gesture = gtk_gesture_click_new();
+		gtk_widget_add_controller(widgetLabelPlayer, GTK_EVENT_CONTROLLER(gesture));
+		g_signal_connect(gesture, "pressed", G_CALLBACK(onPlayerNameClicked), (gpointer)player);
+	} else {
+		widgetHeart = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+	}
+
+	uint8_t c = 1;
+	gtk_grid_attach(grid, widgetLabelPosition, c++, 0, 1, 1);
+	gtk_grid_attach(grid, widgetBoxNationality, c++, 0, 1, 1);
+	gtk_grid_attach(grid, widgetLabelPlayer, c++, 0, 1, 1);
+	gtk_grid_attach(grid, widgetLabelAge, c++, 0, 1, 1);
+	gtk_grid_attach(grid, widgetHeart, c++, 0, 1, 1);
+	gtk_grid_attach(grid, widgetLabelRating, c++, 0, 1, 1);
+	gtk_list_box_row_set_child(row, widgetGrid);
+
+	return player != NULL ? player->ratings[0].value : 0.f;
+}
+
+/** Appends a line-up, followed by its average rating when anyone made it in. */
+static void appendLineUp(GtkListBox *listBox, const Formation *formation, const BestElevenRow rows[FORMATION_POSITION_COUNT]) {
 	uint8_t playerIncludedCount = 0;
 	float ratingTotal = 0;
 	for (uint8_t i = 0; i < FORMATION_POSITION_COUNT; ++i) {
-		GtkWidget *widgetRow = gtk_list_box_row_new();
-		GtkListBoxRow *row = GTK_LIST_BOX_ROW(widgetRow);
-		gtk_list_box_row_set_activatable(row, false);
-		gtk_list_box_row_set_selectable(row, false);
-		gtk_list_box_append(listBox, widgetRow);
-
-		GtkWidget *widgetGrid = gtk_grid_new();
-		GtkGrid *grid = GTK_GRID(widgetGrid);
-		gtk_grid_set_column_spacing(grid, 12);
-
-		GtkWidget *widgetLabelPosition = gtk_label_new(positionCodeNames[formation.positions[i]]);
-		gtk_label_set_yalign(GTK_LABEL(widgetLabelPosition), GTK_ALIGN_CENTER);
-		gtk_widget_add_css_class(widgetLabelPosition, "position");
-
-		GtkWidget *widgetBoxNationality = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-		GtkWidget *widgetLabelPlayer = gtk_label_new("");
-		GtkWidget *widgetLabelAge = gtk_label_new("");
-		GtkWidget *widgetHeart;
-		GtkWidget *widgetLabelRating = gtk_label_new("");
-
-		const Player *player = rows[i].player;
-		if (player != NULL) {
-			gtk_widget_set_hexpand(widgetLabelPlayer, true);
-			gtk_label_set_xalign(GTK_LABEL(widgetLabelPlayer), 0);
-			gtk_label_set_yalign(GTK_LABEL(widgetLabelPlayer), GTK_ALIGN_CENTER);
-			gtk_widget_set_hexpand(widgetLabelPlayer, true);
-			gtk_widget_add_css_class(widgetLabelPlayer, "name");
-
-			// Name
-			if (player->commonName[0] == '\0') {
-				char buffer[PERSON_FORENAME_LENGTH + PERSON_SURNAME_LENGTH + 2];
-				snprintf(buffer, sizeof(buffer), "%s %s", player->forename, player->surname);
-				gtk_label_set_text(GTK_LABEL(widgetLabelPlayer), buffer);
-			} else {
-				gtk_label_set_text(GTK_LABEL(widgetLabelPlayer), player->commonName);
-			}
-
-			// Age
-			char ageBuffer[8];
-			snprintf(ageBuffer, sizeof(ageBuffer), "%d yrs", player->age);
-			gtk_label_set_text(GTK_LABEL(widgetLabelAge), ageBuffer);
-
-			// Rating
-			char ratingBuffer[FORMATTER_RATING_SIZE];
-			formatter_formatRating(player->ratings[0].value, ratingBuffer);
-			gtk_label_set_markup(GTK_LABEL(widgetLabelRating), ratingBuffer);
-			gtk_label_set_xalign(GTK_LABEL(widgetLabelRating), 1.f);
-
-			// Country flag
-			const Nation *nation = entities_getNation(player->nationality[0]);
-			if (nation != NULL) {
-				char pathToFlag[256] = {0};
-				snprintf(
-					pathToFlag,
-					sizeof(pathToFlag),
-					RESOURCE_BASE "/assets/flags/%s.png",
-					nation->code
-				);
-				GtkWidget *flagImage = gtk_image_new_from_resource(pathToFlag);
-				gtk_box_append(GTK_BOX(widgetBoxNationality), flagImage);
-				gtk_widget_set_tooltip_text(flagImage, nation->name);
-			}
-
-			if (player->injury.duration > 0) {
-				widgetHeart = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-				GtkWidget *label = gtk_label_new("🚑");
-				gtk_box_append(GTK_BOX(widgetHeart), label);
-				char buffer[128] = {0};
-				snprintf(buffer, 128, "Injured: %s", injuryNames_get(player->injury.nameIndex));
-				gtk_widget_set_tooltip_text(label, buffer);
-			} else {
-				widgetHeart = icons_new(ICON_HEART, icons_conditionQuantise(player->condition));
-			}
-
-
+		ratingTotal += appendPlayerRow(listBox, formation->positions[i], rows[i].player);
+		if (rows[i].player != NULL) {
 			++playerIncludedCount;
-			ratingTotal += player->ratings[0].value;
-
-			GtkGesture *gesture = gtk_gesture_click_new();
-			gtk_widget_add_controller(widgetLabelPlayer, GTK_EVENT_CONTROLLER(gesture));
-			g_signal_connect(gesture, "pressed", G_CALLBACK(onPlayerNameClicked), (gpointer)player);
-		} else {
-			widgetHeart = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 		}
-
-		uint8_t c = 1;
-		gtk_grid_attach(grid, widgetLabelPosition, c++, i, 1, 1);
-		gtk_grid_attach(grid, widgetBoxNationality, c++, i, 1, 1);
-		gtk_grid_attach(grid, widgetLabelPlayer, c++, i, 1, 1);
-		gtk_grid_attach(grid, widgetLabelAge, c++, i, 1, 1);
-		gtk_grid_attach(grid, widgetHeart, c++, i, 1, 1);
-		gtk_grid_attach(grid, widgetLabelRating, c++, i, 1, 1);
-		gtk_list_box_row_set_child(row, widgetGrid);
 	}
 
 	if (playerIncludedCount > 0) {
@@ -260,18 +266,90 @@ static void renderBestElevenTable(const WindowContext context) {
 
 		char averageRatingBuffer[128];
 		snprintf(averageRatingBuffer, sizeof(averageRatingBuffer), "<span weight=\"800\">Average:</span> %s", ratingBuffer);
-		GtkWidget *widgetLabelAverageRating = gtk_label_new("");
-		gtk_label_set_markup(GTK_LABEL(widgetLabelAverageRating), averageRatingBuffer);
-		GtkWidget *widgetRow = gtk_list_box_row_new();
-		GtkListBoxRow *row = GTK_LIST_BOX_ROW(widgetRow);
-		gtk_widget_add_css_class(widgetRow, "average-rating");
-		gtk_widget_set_hexpand(widgetRow, true);
-		gtk_widget_set_halign(widgetLabelAverageRating, GTK_ALIGN_END);
-		gtk_list_box_row_set_activatable(row, false);
-		gtk_list_box_row_set_selectable(row, false);
-		gtk_list_box_row_set_child(row, widgetLabelAverageRating);
-		gtk_list_box_append(listBox, widgetRow);
+		appendLabelRow(listBox, averageRatingBuffer, "average-rating", GTK_ALIGN_END);
 	}
+}
+
+/**
+ * The bench is the best line-up that can be made from everyone the first eleven left out, so each
+ * slot shows the next-best option for that position.
+ */
+static void computeBench(
+	const Player *players,
+	const uint32_t playerCount,
+	const Formation *formation,
+	const BestElevenFilters filters,
+	const BestElevenRow firstEleven[FORMATION_POSITION_COUNT],
+	BestElevenRow outBench[FORMATION_POSITION_COUNT]
+) {
+	bool *excluded = playerCount > 0 ? calloc(playerCount, sizeof(bool)) : NULL;
+	for (uint8_t i = 0; i < FORMATION_POSITION_COUNT && excluded != NULL; ++i) {
+		if (firstEleven[i].player != NULL) {
+			excluded[firstEleven[i].player - players] = true;
+		}
+	}
+
+	assignFormation(players, playerCount, formation->positions, filters, excluded, outBench);
+	free(excluded);
+}
+
+static void renderBestElevenTable(const WindowContext context) {
+	const Formation *formation = getSelectedFormation(context);
+	const PlayerSnapshot *snapshot = context.data;
+
+	GtkListBox *listBox = GTK_LIST_BOX(gtk_builder_get_object(context.builder, "list-box:best-xi"));
+	gtk_list_box_remove_all(listBox);
+
+	const Player *players = snapshot != NULL ? snapshot->players : NULL;
+	const uint32_t playerCount = snapshot != NULL ? snapshot->count : 0;
+	const BestElevenFilters filters = getFilters(context);
+
+	BestElevenRow rows[FORMATION_POSITION_COUNT] = {0};
+#ifdef DEBUG
+	const int64_t timeStart = platform_getMicroseconds();
+#endif
+	assignFormation(players, playerCount, formation->positions, filters, NULL, rows);
+	LOG_DEBUG(
+		"Found best XI for %" PRIu32 " players in %" PRId64 " microseconds",
+		playerCount,
+		platform_getMicroseconds() - timeStart
+	);
+
+	appendLineUp(listBox, formation, rows);
+
+	GtkCheckButton *checkboxShowBench = GTK_CHECK_BUTTON(
+		gtk_builder_get_object(context.builder, "checkbox:best-xi:show-bench")
+	);
+	if (gtk_check_button_get_active(checkboxShowBench)) {
+		BestElevenRow bench[FORMATION_POSITION_COUNT] = {0};
+		computeBench(players, playerCount, formation, filters, rows, bench);
+		appendLabelRow(listBox, "<span weight=\"800\">Bench</span>", "bench-heading", GTK_ALIGN_START);
+		appendLineUp(listBox, formation, bench);
+	}
+}
+
+static void onFindUpgradesClicked(GtkButton *button, gpointer userData) {
+	(void)button;
+	const WindowContext context = *(const WindowContext*)userData;
+	const Formation *formation = getSelectedFormation(context);
+	const PlayerSnapshot *snapshot = context.data;
+	const Player *players = snapshot != NULL ? snapshot->players : NULL;
+	const uint32_t playerCount = snapshot != NULL ? snapshot->count : 0;
+
+	BestElevenRow rows[FORMATION_POSITION_COUNT] = {0};
+	assignFormation(players, playerCount, formation->positions, getFilters(context), NULL, rows);
+
+	GtkSpinButton *spinImprovement = GTK_SPIN_BUTTON(gtk_builder_get_object(context.builder, "spin:upgrade-improvement"));
+	GtkSpinButton *spinBudget = GTK_SPIN_BUTTON(gtk_builder_get_object(context.builder, "spin:upgrade-budget"));
+	GtkSpinButton *spinMaxAge = GTK_SPIN_BUTTON(gtk_builder_get_object(context.builder, "spin:upgrade-max-age"));
+	ui_createUpgradeFinderWindow(
+		formation->positions,
+		rows,
+		snapshot,
+		(float)gtk_spin_button_get_value(spinImprovement),
+		(uint32_t)(gtk_spin_button_get_value(spinBudget) * 1e6),
+		(uint8_t)gtk_spin_button_get_value_as_int(spinMaxAge)
+	);
 }
 
 static void onFormationSelected(GObject *object, GParamSpec *pspec, gpointer userData) {
@@ -433,7 +511,8 @@ static void insertTopK(
 
 /**
  * Assigns players from `players` to each slot in `positions` so as to maximise
- * the cumulative positional rating. A player is eligible for a slot only if they
+ * the cumulative positional rating, skipping any flagged in `excluded` (which may be NULL; it is
+ * indexed like `players` and is how the bench leaves out the first eleven). A player is eligible for a slot only if they
  * meet MINIMUM_POSITIONAL_PROFICIENCY for the slot's position and have a rating
  * for the grouped role that owns it. Eligible cost = −rating (minimisation ≡
  * maximisation); ineligible/empty cost is chosen so the solver never prefers it
@@ -452,6 +531,7 @@ static void assignFormation(
 	const uint32_t playerCount,
 	const PositionCode positions[FORMATION_POSITION_COUNT],
 	const BestElevenFilters filters,
+	const bool *excluded,
 	BestElevenRow outSlots[FORMATION_POSITION_COUNT]
 ) {
 	// Default every slot to empty; filled in as the solver assigns players.
@@ -499,6 +579,7 @@ static void assignFormation(
 			const Player *player = &players[j];
 
 			if (
+				(excluded != NULL && excluded[j]) ||
 				player->age < filters.minAge ||
 				player->age > filters.maxAge ||
 				player->condition < filters.minCondition ||

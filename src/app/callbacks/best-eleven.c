@@ -12,3 +12,7 @@ BUILDER_CALLBACK void callbacks_onShowBestEleven(void) {
 BUILDER_CALLBACK void callbacks_onShowSquadDepth(void) {
 	ui_createSquadDepthWindow();
 }
+
+BUILDER_CALLBACK void callbacks_onShowShortlist(void) {
+	ui_createShortlistWindow();
+}

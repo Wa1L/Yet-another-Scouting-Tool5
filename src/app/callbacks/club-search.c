@@ -87,10 +87,17 @@ void callbacks_onClubNameSelected(
 
 	GtkWidget *child = gtk_list_box_row_get_child(row);
 	const int64_t clubIndex = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "index"));
-	const Club *club = entities_getClub(clubIndex);
-	if (club == NULL) {
+	if (!clubSearch_select(clubIndex)) {
 		gtk_popover_popdown(dataList->popover);
-		return;
+	}
+}
+
+/** Filters the search by a club, as if it had been picked from the club search's list. */
+bool clubSearch_select(const int64_t clubIndex) {
+	const SearchDatalist *dataList = gameContext.clubDatalist;
+	const Club *club = entities_getClub(clubIndex);
+	if (club == NULL || dataList == NULL) {
+		return false;
 	}
 
 	// Block the change handler while we update the text
@@ -117,6 +124,8 @@ void callbacks_onClubNameSelected(
 	// NOTE: this is the same as the on-enter handler
 	searchHandler_doSearch(true);
 	callbacks_updateFilterTags();
+
+	return true;
 }
 
 // This runs on the main thread; it's safe to modify the UI

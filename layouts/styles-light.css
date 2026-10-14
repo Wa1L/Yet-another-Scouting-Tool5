@@ -19,6 +19,8 @@ window {
 	--border-colour-pill-learner: #3182ce;
 	--background-colour-pill-prospect: #fdeee1;
 	--border-colour-pill-prospect: #dd6b20;
+	--background-colour-pill-transfer: #fbe9e9;
+	--border-colour-pill-transfer: #c53030;
 	--background-colour-popover: var(--background-colour-primary);
 	--background-colour-primary: #fff;
 	--border-colour-primary: #d0d7de;
@@ -38,10 +40,12 @@ window {
 	--colour-on-accent: var(--background-colour-primary);
 	--colour-pill-learner: #1a4971;
 	--colour-pill-prospect: #8a4b16;
+	--colour-pill-transfer: #822727;
 	--colour-potential-ability: #1a7f4b;
 	--colour-primary: #24292f;
 	--colour-primary-dark: #4b535b;
 	--colour-primary-darker: #6a737d;
 	--colour-section-heading: #57606a;
 	--colour-title: #1b1f24;
+	--colour-warning: #b4530a;
 }

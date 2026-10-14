@@ -46,6 +46,28 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 				<property name="page-increment">5</property>
 			</object>
 
+			<object class="GtkAdjustment" id="adjustment:upgrade-improvement">
+				<property name="lower">0.5</property>
+				<property name="upper">50</property>
+				<property name="value">5</property>
+				<property name="step-increment">0.5</property>
+				<property name="page-increment">5</property>
+			</object>
+			<object class="GtkAdjustment" id="adjustment:upgrade-budget">
+				<property name="lower">0</property>
+				<property name="upper">2000</property>
+				<property name="value">0</property>
+				<property name="step-increment">1</property>
+				<property name="page-increment">10</property>
+			</object>
+			<object class="GtkAdjustment" id="adjustment:upgrade-max-age">
+				<property name="lower">14</property>
+				<property name="upper">50</property>
+				<property name="value">50</property>
+				<property name="step-increment">1</property>
+				<property name="page-increment">5</property>
+			</object>
+
 			<object class="GtkStringList" id="string-list:formation"/>
 
 			<object class="GtkBox">
@@ -113,7 +135,9 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 							<object class="GtkScrolledWindow">
 								<property name="hexpand">true</property>
 								<property name="hscrollbar-policy">never</property>
-								<property name="vscrollbar-policy">never</property>
+								<property name="vscrollbar-policy">automatic</property>
+								<property name="propagate-natural-height">true</property>
+								<property name="max-content-height">720</property>
 								<property name="kinetic-scrolling">false</property>
 								<style>
 									<class name="table"/>
@@ -267,6 +291,125 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 												</style>
 											</object>
 										</child>
+									</object>
+								</child>
+								<child>
+									<object class="GtkCheckButton" id="checkbox:best-xi:show-bench">
+										<property name="label">Show bench</property>
+										<property name="tooltip-text">The next-best option for every position</property>
+										<property name="halign">start</property>
+										<style>
+											<class name="heading"/>
+										</style>
+									</object>
+								</child>
+							</object>
+						</child>
+
+						<child>
+							<object class="GtkBox" id="best_eleven_upgrades">
+								<property name="orientation">vertical</property>
+								<property name="spacing">12</property>
+								<style>
+									<class name="card"/>
+								</style>
+								<child>
+									<object class="GtkLabel">
+										<property name="label">Upgrade finder</property>
+										<property name="halign">start</property>
+										<property name="xalign">0</property>
+										<style>
+											<class name="title-3"/>
+										</style>
+									</object>
+								</child>
+								<child>
+									<object class="GtkLabel">
+										<property name="label">Search the whole database for players who would improve on this eleven.</property>
+										<property name="halign">start</property>
+										<property name="xalign">0</property>
+										<property name="wrap">true</property>
+										<property name="max-width-chars">28</property>
+										<style>
+											<class name="upgrade-hint"/>
+										</style>
+									</object>
+								</child>
+								<child>
+									<object class="GtkGrid">
+										<property name="column-spacing">8</property>
+										<property name="row-spacing">8</property>
+										<child>
+											<object class="GtkLabel">
+												<property name="label">Improve by at least</property>
+												<property name="xalign">0</property>
+												<layout>
+													<property name="column">0</property>
+													<property name="row">0</property>
+												</layout>
+											</object>
+										</child>
+										<child>
+											<object class="GtkSpinButton" id="spin:upgrade-improvement">
+												<property name="adjustment">adjustment:upgrade-improvement</property>
+												<property name="numeric">true</property>
+												<property name="digits">1</property>
+												<layout>
+													<property name="column">1</property>
+													<property name="row">0</property>
+												</layout>
+											</object>
+										</child>
+										<child>
+											<object class="GtkLabel">
+												<property name="label">Max value (£M)</property>
+												<property name="tooltip-text">0 means no limit</property>
+												<property name="xalign">0</property>
+												<layout>
+													<property name="column">0</property>
+													<property name="row">1</property>
+												</layout>
+											</object>
+										</child>
+										<child>
+											<object class="GtkSpinButton" id="spin:upgrade-budget">
+												<property name="adjustment">adjustment:upgrade-budget</property>
+												<property name="tooltip-text">0 means no limit</property>
+												<property name="numeric">true</property>
+												<layout>
+													<property name="column">1</property>
+													<property name="row">1</property>
+												</layout>
+											</object>
+										</child>
+										<child>
+											<object class="GtkLabel">
+												<property name="label">Max age</property>
+												<property name="xalign">0</property>
+												<layout>
+													<property name="column">0</property>
+													<property name="row">2</property>
+												</layout>
+											</object>
+										</child>
+										<child>
+											<object class="GtkSpinButton" id="spin:upgrade-max-age">
+												<property name="adjustment">adjustment:upgrade-max-age</property>
+												<property name="numeric">true</property>
+												<layout>
+													<property name="column">1</property>
+													<property name="row">2</property>
+												</layout>
+											</object>
+										</child>
+									</object>
+								</child>
+								<child>
+									<object class="GtkButton" id="button:find-upgrades">
+										<property name="label">Find upgrades</property>
+										<style>
+											<class name="btn-primary"/>
+										</style>
 									</object>
 								</child>
 							</object>

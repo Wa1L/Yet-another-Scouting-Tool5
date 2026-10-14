@@ -59,8 +59,10 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 										<child>
 											<object class="GtkLabel" id="label:club-name">
 												<property name="label"/>
+												<property name="tooltip-text">Show this club's players</property>
 												<style>
 													<class name="heading"/>
+													<class name="clickable"/>
 												</style>
 												<property name="halign">1</property>
 												<property name="xalign">0</property>
@@ -122,6 +124,15 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 										</child>
 									</object>
 								</child>
+								<child>
+									<object class="GtkLabel" id="label:contract">
+										<property name="halign">1</property>
+										<property name="xalign">0</property>
+										<style>
+											<class name="player-contract"/>
+										</style>
+									</object>
+								</child>
 							</object>
 						</child>
 						<child>
@@ -152,8 +163,52 @@ SPDX-License-Identifier: GPL-3.0-or-later -->
 										</child>
 									</object>
 								</child>
+								<child>
+									<object id="widget:transfer-status" class="GtkBox">
+										<property name="halign">2</property>
+										<property name="css-classes">pill-transfer</property>
+										<child>
+											<object class="GtkLabel" id="label:transfer-status"/>
+										</child>
+									</object>
+								</child>
+								<child>
+									<object class="GtkBox">
+										<property name="halign">2</property>
+										<property name="spacing">6</property>
+										<property name="margin-top">4</property>
+										<child>
+											<object class="GtkButton" id="button:shortlist">
+												<property name="tooltip-text">Track this player's progress in the Shortlist (Ctrl+S)</property>
+												<style>
+													<class name="btn-secondary"/>
+												</style>
+											</object>
+										</child>
+										<child>
+											<object class="GtkButton" id="button:similar">
+												<property name="label">Similar players</property>
+												<property name="tooltip-text">Find players with a similar attribute profile</property>
+												<style>
+													<class name="btn-secondary"/>
+												</style>
+											</object>
+										</child>
+									</object>
+								</child>
 							</object>
 						</child>
+					</object>
+				</child>
+				<child>
+					<object class="GtkLabel" id="label:tracking">
+						<property name="visible">false</property>
+						<property name="halign">1</property>
+						<property name="xalign">0</property>
+						<property name="wrap">true</property>
+						<style>
+							<class name="tracking-summary"/>
+						</style>
 					</object>
 				</child>
 				<child>
